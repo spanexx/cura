@@ -1,0 +1,47 @@
+﻿# Handoff: Full UI restyle of Ryanair Agent Simulator
+
+## Product snapshot
+- App: Ryanair customer-service chat trainer. React 18 + Vite 5 + Tailwind 3, lucide-react icons.
+- All source in `airline/src/` (App.jsx ~1450 lines is the whole UI). Repo root = workspace root.
+- Live: https://spanexx.github.io/cura/ - GitHub Pages, auto-deploys on push via `.github/workflows/deploy-pages.yml` (repo is PUBLIC; Source = GitHub Actions; deploy green as of handoff).
+- Remote: origin = https://github.com/spanexx/cura.git, branch `main`, upstream tracking set (plain `git push` works).
+- Repo layout note: after the history cleanup, the remote tree intentionally contains ONLY `airline/`, `.github/`, and `sessions/` (per user request). Training materials (teach/, reference/, lessons/, etc.) exist only locally, untracked.
+
+## State at handoff (all committed, pushed, deploy green)
+- Setup/home: KPI dashboard (Sessions / Avg Score / Best / SLA-Clean tiles + expandable session log), "Generate AI Case", "Build Custom Case", green "Practice Offline (No AI)" button, Start disabled until a case is selected. No pre-saved cases.
+- `src/airlineCases.js`: 12 archetypes x 2 variants with randomized passengers/routes/PNRs; powers AI fallback AND practice mode.
+- Practice offline mode: scripted customer (arc: complaint -> 2 pushbacks -> cooperative -> satisfied), local scorecard, zero LLM calls.
+- AI mode: settings modal (gemini / openai-compatible), Base URL auto-normalized to `/llm-proxy/v1` via `normalizeBaseUrl()` in `src/llm.js` (Vite dev/preview proxy; does NOT exist on Pages).
+- Persistence (DO NOT break): settings key `ryanair-agent-simulator.llm-settings`; history key `ryanair-agent-simulator.session-history` via `src/history.js` (cap 20, sanitized reads).
+- KPI engine: `addEventLog` drives live score + audit stream; 2-min SLA, 15-min timer, patience decay, sentiment, WPM, holds.
+
+## Next session goal: FULL UI RESTYLE
+Scope: setup/home screen, case cards, chat view (header KPIs, sidebar metrics panel, audit stream, composer), settings + custom-case modals, hold/end controls, scorecard screen.
+Hard constraints:
+- Tailwind 3 only; lucide-react for icons. No new UI deps unless user approves.
+- Restyle classes/markup ONLY - do not touch state flow, KPI wiring, timers, persistence keys, or generator logic.
+- App.jsx is a monolith; consider extracting components (SetupScreen, ChatView, KpiSidebar, Scorecard, modals) as part of the restyle - but each extraction must be behavior-identical (build + click-test after each).
+- Brand direction UNKNOWN - ASK USER FIRST: (a) keep polished dark-slate vs light professional; (b) Ryanair brand (navy #073590 + yellow #F1C933 accents; header already #073590) vs neutral airline look; (c) any reference sites they like.
+
+## Build/verify loop (run after every chunk of changes)
+1. `cd airline; npm run build` - must pass
+2. `node scripts/check-tw-coverage.mjs` - must print `MISSING: 0` (it reads `dist/`, so ALWAYS run AFTER build; running it before/during build gives false "missing" results)
+3. `npm run preview` (port 4173) to click-test; `/llm-proxy/v1` only works in dev/preview, never on Pages
+4. `git push` triggers Pages deploy (builds with `VITE_PUBLIC_BASE=/cura/`); verify asset URLs under `/cura/` and run goes green
+
+## Gotchas (all learned the hard way this session)
+- Editor tool: keep each edit < 6000 chars; split large writes. NEVER parallel-edit the same file with identical anchors (that corrupted a catch block once - the build caught it). Sequential same-file edits with unique verified anchors.
+- App.jsx line numbers shift after every edit - re-read the region before anchoring the next edit.
+- PowerShell: avoid here-strings with GitHub-expressions content and complex escaping; prefer the editor tool for writing files.
+- Any hardcoded absolute asset URL must respect the `/cura/` base on Pages; prefer relative paths or Vite asset imports.
+- Stray legacy files to ignore (not app code): `airline/src/App.jsx.bak`, `airline/scripts/extract-llm.mjs`, stale root `ryanair_agent_simulator.tsx`, `airline/tests/llm.test.js` (incomplete). Ask user before deleting.
+- GitHub API checks from PowerShell need a User-Agent header or they 403.
+
+## Suggested next-session flow
+1. `situation-awareness` -> picks up this handoff.
+2. Ask the 3 style questions above; get a decision before touching code.
+3. Optional: `wireframe` the new look (mock-first keeps restyle honest), then restyle section by section: home -> chat view -> modals -> scorecard, building + tw-check after each.
+4. If extracting components: `codebase-design` for the split; move files, then restyle.
+5. Commit(s) with clear messages, push, verify Pages deploy green, open live URL.
+
+Suggested skills: `wireframe` (mock first), `codebase-design` (component split), `surgical-change` (per-section discipline), `health` (post-restyle sweep).

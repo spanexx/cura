@@ -1,0 +1,56 @@
+﻿name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages needs these permissions to publish the build artifacts
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: airline/package-lock.json
+
+      - name: Install dependencies
+        working-directory: airline
+        run: npm ci
+
+      - name: Build
+        working-directory: airline
+        run: npm run build
+        env:
+          # Project site lives at https://spanexx.github.io/cura/
+          VITE_PUBLIC_BASE: /cura/
+
+      - name: SPA fallback (404 -> index.html)
+        run: cp airline/dist/index.html airline/dist/404.html
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: airline/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

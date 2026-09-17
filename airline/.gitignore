@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+serve-css-dump.txt
+
+# Stale snapshots and scratch files
+*.bak
+hi.md
+ryanair_agent_simulator.tsx
+build-log.txt
+
