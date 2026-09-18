@@ -35,13 +35,16 @@ import {
   Globe,
   Key,
   Server,
-  Plus
+  Plus,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 import { callLlm, cleanAndParseJson, normalizeBaseUrl } from './llm';
 import { generateAirlineCase, AIRLINE_CATEGORY_NAMES } from './airlineCases';
 import { DEFAULT_LLM_SETTINGS, clearLlmSettings, loadLlmSettings, saveLlmSettings } from './settings';
 import { loadSessionHistory, appendSession, saveSessionHistory, clearSessionHistory, sanitizeSession } from './history';
+import { loadTheme, saveTheme, applyTheme, nextTheme } from './theme';
 
 // Tiny local random picker for offline practice replies.
 const rand2 = {
@@ -50,9 +53,9 @@ const rand2 = {
 
 // Small stat tile for the home-screen KPI dashboard.
 const KpiTile = ({ label, value, icon }) => (
-  <div className="rounded-lg bg-slate-900/50 border border-slate-700/60 px-3 py-2.5">
-    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">{icon}{label}</div>
-    <div className="text-lg font-black text-white leading-none">{value}</div>
+  <div className="rounded-xl bg-surface-2/60 border border-line/70 px-3 py-2.5 transition hover:border-line-strong">
+    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-3 mb-1">{icon}{label}</div>
+    <div className="text-lg font-black text-ink leading-none">{value}</div>
   </div>
 );
 
@@ -109,6 +112,9 @@ export default function App() {
 
   // Titles of recently generated cases so quick repeat clicks do not repeat a story.
   const [recentTitles, setRecentTitles] = useState([]);
+
+  // Theme: dark by default, switchable to light (see ./theme.js).
+  const [theme, setTheme] = useState(loadTheme);
 
   // Persistent KPI history shown on the home-screen dashboard.
   const [sessionHistory, setSessionHistory] = useState(loadSessionHistory);
@@ -411,6 +417,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
   useEffect(() => {
     saveLlmSettings({ provider, baseUrl, apiKey, modelId, temperature, topP, maxTokens });
   }, [provider, baseUrl, apiKey, modelId, temperature, topP, maxTokens]);
+
+  // Keep the document in step with the chosen theme and remember it.
+  useEffect(() => {
+    applyTheme(theme);
+    saveTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     let interval = null;
@@ -933,33 +945,43 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
   const slaCleanRate = totalSessions ? Math.round((sessionHistory.filter((e) => e.violations === 0).length / totalSessions) * 100) : 0;
 
   return (
-    <div className="h-screen bg-slate-900 text-slate-100 font-sans flex flex-col overflow-hidden">
+    <div className="h-screen bg-canvas text-ink font-sans flex flex-col overflow-hidden">
       {/* HEADER BAR WITH LIVE CONNECTED KPI HUD */}
-      <header className="bg-[#073590] border-b border-blue-900 px-6 py-2.5 flex items-center justify-between shadow-lg shrink-0">
-        <div className="flex items-center space-x-3">
-          <div className="bg-[#F1C40F] text-[#073590] p-2 rounded-lg font-black text-xl tracking-tighter flex items-center space-x-1">
-            <Plane className="w-6 h-6 fill-current rotate-45" />
-            <span>RYANAIR</span>
+      <header className="bg-surface border-b border-line px-5 py-2.5 flex items-center justify-between gap-4 shadow-sm shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="bg-brand text-on-brand p-2 rounded-xl shadow-sm shrink-0">
+            <Plane className="w-5 h-5 fill-current rotate-45" />
           </div>
-          <div className="h-6 w-px bg-blue-800"></div>
-          <div>
-            <h1 className="text-base font-bold text-white tracking-wide">CS Agent Simulator & Connected KPI Lab</h1>
-            <p className="text-xs text-blue-200">Interconnected Performance Engine</p>
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-bold text-ink tracking-tight flex items-center gap-2">
+              <span className="truncate">Ryanair Agent Simulator</span>
+              <span className="hidden sm:inline text-[9px] font-bold uppercase tracking-wider text-brand bg-brand/10 border border-brand/30 px-1.5 py-0.5 rounded shrink-0">KPI Lab</span>
+            </h1>
+            <p className="text-[11px] text-ink-3">Interconnected Performance Engine</p>
           </div>
         </div>
 
         <div className="flex items-center space-x-3">
           <button
+            onClick={() => setTheme((prev) => nextTheme(prev))}
+            className="bg-surface-2 hover:bg-surface-3 text-ink-2 hover:text-ink border border-line p-2 rounded-lg transition shrink-0"
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          <button
             onClick={() => {
               setLlmTest(null);
               setShowSettingsModal(true);
             }}
-            className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition"
+            className="bg-surface-2/80 hover:bg-surface-3 text-ink border border-line px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition"
             title="Configure LLM Endpoint & Parameters"
           >
-            <Settings className="w-3.5 h-3.5 text-amber-400" />
+            <Settings className="w-3.5 h-3.5 text-warn" />
             <span>LLM Settings</span>
-            <span className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded font-mono text-blue-300">
+            <span className="text-[10px] bg-surface px-1.5 py-0.5 rounded font-mono text-brand">
               {provider === 'openai_compatible' ? 'OpenAI Compatible' : 'Gemini'}
             </span>
           </button>
@@ -967,20 +989,20 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           {appState === 'simulating' && (
             <div className="flex items-center space-x-5">
               {/* Live Interconnected Quality Rating */}
-              <div className="flex items-center space-x-2 bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-700/80">
-                <Gauge className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
+                <Gauge className="w-4 h-4 text-ok" />
                 <div>
-                  <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider">Live Quality Score</p>
+                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Live Quality Score</p>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-sm font-mono font-black ${
-                      liveScore >= 85 ? 'text-emerald-400' : liveScore >= 70 ? 'text-amber-400' : 'text-red-400'
+                      liveScore >= 85 ? 'text-ok' : liveScore >= 70 ? 'text-warn' : 'text-danger'
                     }`}>
                       {liveScore}%
                     </span>
-                    <div className="w-12 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className="w-12 bg-surface-2 h-1.5 rounded-full overflow-hidden">
                       <div 
                         className={`h-full transition-all duration-300 ${
-                          liveScore >= 85 ? 'bg-emerald-400' : liveScore >= 70 ? 'bg-amber-400' : 'bg-red-400'
+                          liveScore >= 85 ? 'bg-ok' : liveScore >= 70 ? 'bg-warn' : 'bg-danger'
                         }`} 
                         style={{ width: `${liveScore}%` }}
                       ></div>
@@ -990,11 +1012,11 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* 15-Min Handling Clock */}
-              <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-                <Clock className={`w-4 h-4 ${totalSeconds < 180 ? 'text-red-400 animate-pulse' : 'text-blue-400'}`} />
+              <div className="flex items-center space-x-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-line">
+                <Clock className={`w-4 h-4 ${totalSeconds < 180 ? 'text-danger animate-pulse' : 'text-brand'}`} />
                 <div>
-                  <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider">Target Resolution</p>
-                  <p className={`text-xs font-mono font-bold ${totalSeconds < 180 ? 'text-red-400' : 'text-white'}`}>
+                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Target Resolution</p>
+                  <p className={`text-xs font-mono font-bold ${totalSeconds < 180 ? 'text-danger' : 'text-ink'}`}>
                     {formatTime(totalSeconds)} / 15:00
                   </p>
                 </div>
@@ -1003,14 +1025,14 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               {/* 2-Min Response Window Clock */}
               <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all ${
                 isOnHold 
-                  ? 'bg-amber-950/60 border-amber-600/50 text-amber-200' 
+                  ? 'bg-warn/15 border-warn/30 text-warn' 
                   : responseSeconds < 30 
-                  ? 'bg-red-950/80 border-red-600 text-red-200 animate-pulse' 
-                  : 'bg-slate-800/80 border-slate-700 text-slate-200'
+                  ? 'bg-danger/20 border-danger text-danger animate-pulse' 
+                  : 'bg-surface-2/80 border-line text-ink'
               }`}>
-                <Zap className="w-4 h-4 text-amber-400" />
+                <Zap className="w-4 h-4 text-warn" />
                 <div>
-                  <p className="text-[9px] text-slate-400 font-medium uppercase tracking-wider">
+                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">
                     {isOnHold ? 'Customer on Hold' : '2-Min SLA Window'}
                   </p>
                   <p className="text-xs font-mono font-bold">
@@ -1019,13 +1041,13 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 </div>
               </div>
 
-              <span className="text-[10px] font-mono bg-emerald-900/60 text-emerald-300 border border-emerald-700 px-2 py-1 rounded">
+              <span className="text-[10px] font-mono bg-ok/15 text-ok border border-ok/30 px-2 py-1 rounded">
                 {isPracticeMode ? 'PRACTICE OFFLINE' : 'AI CONNECTED'}
               </span>
 
               <button
                 onClick={() => handleEndSession('Agent Manually Resolved')}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition"
+                className="bg-ok-strong hover:bg-ok text-on-brand px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition"
               >
                 <CheckCircle className="w-4 h-4" />
                 <span>Resolve Chat</span>
@@ -1034,15 +1056,17 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           )}
         </div>
       </header>
+      {/* Signature airline hairline in the secondary accent colour */}
+      <div className="h-0.5 bg-accent/60 shrink-0"></div>
 
       {/* API ERROR BANNER */}
       {apiError && (
-        <div className="bg-red-900/80 border-b border-red-700 px-4 py-2 text-xs text-red-100 flex items-center justify-between shrink-0">
+        <div className="bg-danger/20 border-b border-danger px-4 py-2 text-xs text-danger flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-red-300" />
+            <AlertTriangle className="w-4 h-4 text-danger" />
             <span className="font-medium">{apiError}</span>
           </div>
-          <button onClick={() => setApiError(null)} className="text-red-300 hover:text-white font-bold text-xs">Dismiss</button>
+          <button onClick={() => setApiError(null)} className="text-danger hover:text-ink font-bold text-xs">Dismiss</button>
         </div>
       )}
 
@@ -1050,12 +1074,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
       {/* HOME-SCREEN KPI DASHBOARD (persistent across refreshes) */}
       {appState === 'setup' && (
         <div className="max-w-5xl mx-auto w-full px-6 pt-6">
-          <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-5">
+          <div className="rounded-2xl bg-surface border border-line p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-bold text-white tracking-wide">Your KPI Dashboard</h3>
-                <span className="text-[10px] text-slate-500">across {totalSessions} saved session{totalSessions === 1 ? '' : 's'}</span>
+                <Gauge className="w-4 h-4 text-brand" />
+                <h3 className="text-sm font-bold text-ink tracking-wide">Your KPI Dashboard</h3>
+                <span className="text-[10px] text-ink-4">across {totalSessions} saved session{totalSessions === 1 ? '' : 's'}</span>
               </div>
               {totalSessions > 0 && (
                 <button
@@ -1065,25 +1089,25 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                       setSessionHistory([]);
                     }
                   }}
-                  className="text-[10px] font-semibold text-slate-400 hover:text-red-400 transition"
+                  className="text-[10px] font-semibold text-ink-3 hover:text-danger transition"
                 >
                   Clear
                 </button>
               )}
             </div>
             {totalSessions === 0 ? (
-              <p className="text-xs text-slate-400">No sessions yet. Finish an AI or offline practice chat and its KPIs will be logged here permanently.</p>
+              <p className="text-xs text-ink-3">No sessions yet. Finish an AI or offline practice chat and its KPIs will be logged here permanently.</p>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  <KpiTile label="Sessions" value={totalSessions} icon={<Activity className="w-3 h-3 text-blue-400" />} />
-                  <KpiTile label="Avg Score" value={avgScore + '%'} icon={<Gauge className="w-3 h-3 text-emerald-400" />} />
-                  <KpiTile label="Best Score" value={bestScore + '%'} icon={<Award className="w-3 h-3 text-amber-400" />} />
-                  <KpiTile label="SLA Clean" value={slaCleanRate + '%'} icon={<CheckCircle className="w-3 h-3 text-blue-400" />} />
+                  <KpiTile label="Sessions" value={totalSessions} icon={<Activity className="w-3 h-3 text-brand" />} />
+                  <KpiTile label="Avg Score" value={avgScore + '%'} icon={<Gauge className="w-3 h-3 text-ok" />} />
+                  <KpiTile label="Best Score" value={bestScore + '%'} icon={<Award className="w-3 h-3 text-warn" />} />
+                  <KpiTile label="SLA Clean" value={slaCleanRate + '%'} icon={<CheckCircle className="w-3 h-3 text-brand" />} />
                 </div>
                 <button
                   onClick={() => setShowHistoryList((v) => !v)}
-                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/40 border border-slate-700/60 rounded-lg py-2 transition"
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-ink-2 hover:text-ink bg-surface/40 border border-line/60 rounded-lg py-2 transition"
                 >
                   <History className="w-3.5 h-3.5" />
                   <span>{showHistoryList ? 'Hide' : 'Show'} session log ({totalSessions})</span>
@@ -1092,17 +1116,17 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 {showHistoryList && (
                   <div className="mt-3 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                     {sessionHistory.map((e) => (
-                      <div key={e.at + e.title} className="flex items-center justify-between gap-3 rounded-lg bg-slate-900/40 border border-slate-700/50 px-3 py-2 text-xs">
+                      <div key={e.at + e.title} className="flex items-center justify-between gap-3 rounded-lg bg-surface/40 border border-line/50 px-3 py-2 text-xs">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${e.mode === 'practice' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-300'}`}>{e.mode === 'practice' ? 'Offline' : 'AI'}</span>
-                            <span className="text-slate-200 font-semibold truncate">{e.title}</span>
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${e.mode === 'practice' ? 'bg-ok/15 text-ok' : 'bg-brand/20 text-brand'}`}>{e.mode === 'practice' ? 'Offline' : 'AI'}</span>
+                            <span className="text-ink font-semibold truncate">{e.title}</span>
                           </div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">{new Date(e.at).toLocaleString()} · {e.handlingTime || '—'} · {e.violations} SLA · {e.holds} hold(s) · {e.sentiment}</div>
+                          <div className="text-[10px] text-ink-4 mt-0.5">{new Date(e.at).toLocaleString()} · {e.handlingTime || '—'} · {e.violations} SLA · {e.holds} hold(s) · {e.sentiment}</div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-base font-black text-white leading-none">{e.score}%</div>
-                          <div className="text-[10px] text-slate-500">Grade {e.grade}</div>
+                          <div className="text-base font-black text-ink leading-none">{e.score}%</div>
+                          <div className="text-[10px] text-ink-4">Grade {e.grade}</div>
                         </div>
                       </div>
                     ))}
@@ -1116,25 +1140,41 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {appState === 'setup' && (
         <div className="flex-1 max-w-5xl mx-auto w-full p-6 flex flex-col justify-center overflow-y-auto">
-          <div className="text-center space-y-2 mb-8">
-            <h2 className="text-3xl font-black text-white tracking-tight">Select Customer Support Case</h2>
-            <p className="text-sm text-slate-400 max-w-xl mx-auto">
-              Simulate live customer chats with active KPI metrics including 2-minute SLA response timer, 15-minute handling limit, typing speed, and policy compliance audit.
+          <div className="text-center mb-7">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand bg-brand/10 border border-brand/30 px-2.5 py-1 rounded-full mb-3">
+              <Sparkles className="w-3 h-3" /> Case Library
+            </span>
+            <h2 className="text-3xl font-black text-ink tracking-tight">Pick a case to simulate</h2>
+            <p className="text-sm text-ink-3 max-w-xl mx-auto mt-2">
+              Every case is generated fresh. Run it as a live chat while the KPI engine scores your response SLA, customer patience, sentiment and policy compliance.
             </p>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+              {[
+                { icon: <Clock className="w-3 h-3" />, label: '2-min response SLA' },
+                { icon: <Gauge className="w-3 h-3" />, label: '15-min handling limit' },
+                { icon: <Activity className="w-3 h-3" />, label: 'Live quality score' },
+                { icon: <ShieldAlert className="w-3 h-3" />, label: 'Policy audit' }
+              ].map((chip) => (
+                <span key={chip.label} className="inline-flex items-center gap-1.5 text-[11px] font-medium text-ink-2 bg-surface border border-line px-2.5 py-1 rounded-lg">
+                  <span className="text-brand">{chip.icon}</span>
+                  {chip.label}
+                </span>
+              ))}
+            </div>
 
-            <div className="flex items-center justify-center space-x-3 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-5">
               <button
                 onClick={handleGenerateAiScenario}
                 disabled={isGeneratingScenario}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-indigo-400/30 flex items-center space-x-2 transition"
+                className="bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-brand/30 flex items-center space-x-2 transition"
               >
-                <Zap className={`w-4 h-4 text-amber-300 ${isGeneratingScenario ? 'animate-spin' : ''}`} />
+                <Zap className={`w-4 h-4 text-warn ${isGeneratingScenario ? 'animate-spin' : ''}`} />
                 <span>{isGeneratingScenario ? 'Generating AI Case...' : 'Generate AI Case'}</span>
               </button>
 
               <button
                 onClick={handlePracticeOffline}
-                className="bg-emerald-700/80 hover:bg-emerald-600 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-emerald-500/30 flex items-center space-x-1.5 transition"
+                className="bg-ok-strong hover:bg-ok text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-ok/30 flex items-center space-x-1.5 transition hover:-translate-y-0.5"
               >
                 <Play className="w-4 h-4" />
                 <span>Practice Offline (No AI)</span>
@@ -1142,9 +1182,9 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
               <button
                 onClick={() => setShowCustomModal(true)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-slate-700 flex items-center space-x-1.5 transition"
+                className="bg-surface-2 hover:bg-surface-3 text-ink font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-line flex items-center space-x-1.5 transition"
               >
-                <Plus className="w-4 h-4 text-blue-400" />
+                <Plus className="w-4 h-4 text-brand" />
                 <span>Build Custom Case</span>
               </button>
             </div>
@@ -1152,9 +1192,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {scenarios.length === 0 && (
-              <div className="md:col-span-3 rounded-xl p-8 border border-dashed border-slate-700 bg-slate-800/30 text-center">
-                <p className="text-sm font-semibold text-slate-200 mb-1">No cases yet</p>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
+              <div className="md:col-span-3 rounded-2xl p-10 border border-dashed border-line-strong bg-surface-2/40 text-center">
+                <div className="w-11 h-11 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center mx-auto mb-3">
+                  <Sparkles className="w-5 h-5 text-brand" />
+                </div>
+                <p className="text-sm font-semibold text-ink mb-1">No cases yet</p>
+                <p className="text-xs text-ink-3 max-w-md mx-auto">
                   Every case is generated fresh - use "Generate AI Case" for a random realistic Ryanair issue (falls back to the built-in offline generator if the AI is unreachable), or "Build Custom Case" to write your own.
                 </p>
               </div>
@@ -1163,33 +1206,36 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               <div
                 key={scen.id}
                 onClick={() => setSelectedScenario(scen)}
-                className={`cursor-pointer rounded-xl p-5 border transition-all relative flex flex-col justify-between ${
-                  selectedScenario.id === scen.id
-                    ? 'bg-blue-950/60 border-blue-500 shadow-lg shadow-blue-950/50 ring-2 ring-blue-500'
-                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600 hover:bg-slate-800/80'
+                className={`group cursor-pointer rounded-2xl p-5 border transition-all duration-200 relative flex flex-col justify-between ${
+                  selectedScenario?.id === scen.id
+                    ? 'bg-brand/10 border-brand shadow-lg shadow-brand/20 ring-2 ring-brand'
+                    : 'bg-surface border-line hover:border-line-strong hover:bg-surface-2 hover:-translate-y-0.5 hover:shadow-lg'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                      scen.difficulty === 'Easy' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                      scen.difficulty === 'Medium' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                      'bg-red-500/20 text-red-400 border border-red-500/30'
+                      scen.difficulty === 'Easy' ? 'bg-ok/15 text-ok border border-ok/30' :
+                      scen.difficulty === 'Medium' ? 'bg-warn/15 text-warn border border-warn/30' :
+                      'bg-danger/15 text-danger border border-danger/30'
                     }`}>
                       {scen.difficulty}
                     </span>
-                    <span className="text-xs font-mono text-slate-400">{scen.pnr}</span>
+                    <span className="flex items-center gap-1.5 text-xs font-mono text-ink-3">
+                      {selectedScenario?.id === scen.id && <Check className="w-3.5 h-3.5 text-brand" />}
+                      {scen.pnr}
+                    </span>
                   </div>
-                  <h3 className="text-base font-bold text-white mb-2">{scen.title}</h3>
-                  <p className="text-xs text-slate-300 mb-4 line-clamp-3 leading-relaxed">{scen.details}</p>
+                  <h3 className="text-base font-bold text-ink mb-2">{scen.title}</h3>
+                  <p className="text-xs text-ink-2 mb-4 line-clamp-3 leading-relaxed">{scen.details}</p>
                 </div>
 
-                <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+                <div className="pt-3 border-t border-line/60 flex items-center justify-between text-xs text-ink-3">
                   <span className="flex items-center gap-1">
-                    <User className="w-3.5 h-3.5 text-slate-500" /> {scen.passenger}
+                    <User className="w-3.5 h-3.5 text-ink-4" /> {scen.passenger}
                   </span>
-                  <span className="flex items-center gap-1 font-mono text-slate-300">
-                    <Plane className="w-3.5 h-3.5 text-blue-400" /> {scen.flight}
+                  <span className="flex items-center gap-1 font-mono text-ink-2">
+                    <Plane className="w-3.5 h-3.5 text-brand" /> {scen.flight}
                   </span>
                 </div>
               </div>
@@ -1201,13 +1247,13 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               onClick={handleStartSimulation}
               disabled={!selectedScenario}
               title={selectedScenario ? 'Start the live chat simulation' : 'Generate or build a case first'}
-              className={`bg-[#073590] text-white font-bold px-8 py-3.5 rounded-xl shadow-lg transition duration-200 flex items-center gap-2 mx-auto ${selectedScenario ? 'hover:bg-blue-700 hover:scale-[1.02]' : 'opacity-40 cursor-not-allowed'}`}
+              className={`bg-brand text-on-brand font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-brand/25 transition duration-200 flex items-center gap-2 mx-auto ${selectedScenario ? 'hover:bg-brand-strong hover:scale-[1.02]' : 'opacity-40 shadow-none cursor-not-allowed'}`}
             >
               <Play className="w-5 h-5 fill-current" />
               <span>Start Connected Live Simulation</span>
             </button>
             {!selectedScenario && (
-              <p className="text-xs text-amber-400/90 mt-2">Generate a case above to enable the simulation.</p>
+              <p className="text-xs text-warn/90 mt-2">Generate a case above to enable the simulation.</p>
             )}
           </div>
         </div>
@@ -1215,41 +1261,41 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {/* CUSTOM CASE MODAL */}
       {showCustomModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-blue-400" /> Build Custom Scenario
+        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-line rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+              <Plus className="w-5 h-5 text-brand" /> Build Custom Scenario
             </h3>
             <form onSubmit={handleAddCustomScenario} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 mb-1">Scenario Title</label>
+                <label className="block text-ink-2 mb-1">Scenario Title</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Baggage Overweight Dispute"
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 mb-1">Passenger Name</label>
+                  <label className="block text-ink-2 mb-1">Passenger Name</label>
                   <input
                     type="text"
                     required
                     placeholder="John Doe"
                     value={customPassenger}
                     onChange={(e) => setCustomPassenger(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 mb-1">Difficulty</label>
+                  <label className="block text-ink-2 mb-1">Difficulty</label>
                   <select
                     value={customDifficulty}
                     onChange={(e) => setCustomDifficulty(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                   >
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
@@ -1259,48 +1305,48 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 mb-1">PNR Ref</label>
+                  <label className="block text-ink-2 mb-1">PNR Ref</label>
                   <input
                     type="text"
                     placeholder="RY991A"
                     value={customPnr}
                     onChange={(e) => setCustomPnr(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 mb-1">Flight</label>
+                  <label className="block text-ink-2 mb-1">Flight</label>
                   <input
                     type="text"
                     placeholder="FR101 (STN -> DUB)"
                     value={customFlight}
                     onChange={(e) => setCustomFlight(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink font-mono"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-slate-300 mb-1">Issue Details & Customer Demands</label>
+                <label className="block text-ink-2 mb-1">Issue Details & Customer Demands</label>
                 <textarea
                   required
                   rows={3}
                   placeholder="Describe the problem..."
                   value={customDetails}
                   onChange={(e) => setCustomDetails(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                 />
               </div>
               <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCustomModal(false)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg"
+                  className="bg-surface-2 hover:bg-surface-3 text-ink-2 px-4 py-2 rounded-lg"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold"
+                  className="bg-brand-strong hover:bg-brand-strong text-on-brand px-4 py-2 rounded-lg font-semibold"
                 >
                   Save Scenario
                 </button>
@@ -1312,15 +1358,15 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Settings className="w-5 h-5 text-amber-400" /> LLM & Endpoint Settings
+        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-line rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                <Settings className="w-5 h-5 text-warn" /> LLM & Endpoint Settings
               </h3>
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
+                className="text-ink-3 hover:text-ink text-xs font-bold"
               >
                 ✕
               </button>
@@ -1329,8 +1375,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             <div className="space-y-4 text-xs">
               {/* Provider Selection */}
               <div>
-                <label className="block text-slate-300 mb-1.5 font-medium flex items-center gap-1.5">
-                  <Server className="w-3.5 h-3.5 text-blue-400" /> API Provider Type
+                <label className="block text-ink-2 mb-1.5 font-medium flex items-center gap-1.5">
+                  <Server className="w-3.5 h-3.5 text-brand" /> API Provider Type
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -1341,12 +1387,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     }}
                     className={`py-2 px-3 rounded-lg border text-left flex items-center justify-between transition ${
                       provider === 'gemini' 
-                        ? 'bg-blue-950/80 border-blue-500 text-white font-bold' 
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                        ? 'bg-brand/20 border-brand text-ink font-bold' 
+                        : 'bg-surface-2 border-line text-ink-3 hover:bg-surface-3'
                     }`}
                   >
                     <span>Google Gemini</span>
-                    {provider === 'gemini' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                    {provider === 'gemini' && <Check className="w-3.5 h-3.5 text-brand" />}
                   </button>
 
                   <button
@@ -1357,12 +1403,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     }}
                     className={`py-2 px-3 rounded-lg border text-left flex items-center justify-between transition ${
                       provider === 'openai_compatible' 
-                        ? 'bg-indigo-950/80 border-indigo-500 text-white font-bold' 
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                        ? 'bg-brand/15 border-brand text-ink font-bold' 
+                        : 'bg-surface-2 border-line text-ink-3 hover:bg-surface-3'
                     }`}
                   >
                     <span>OpenAI / Custom Endpoint</span>
-                    {provider === 'openai_compatible' && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                    {provider === 'openai_compatible' && <Check className="w-3.5 h-3.5 text-brand" />}
                   </button>
                 </div>
               </div>
@@ -1370,52 +1416,52 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               {/* Base URL (for OpenAI Compatible) */}
               {provider === 'openai_compatible' && (
                 <div>
-                  <label className="block text-slate-300 mb-1 font-medium flex items-center gap-1.5">
-                    <Globe className="w-3.5 h-3.5 text-blue-400" /> Custom Base URL
+                  <label className="block text-ink-2 mb-1 font-medium flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-brand" /> Custom Base URL
                   </label>
                   <input
                     type="text"
                     placeholder="e.g. https://api.openai.com/v1 or http://localhost:11434/v1"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink font-mono focus:outline-none focus:border-brand"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Supports OpenAI, OpenRouter, Ollama, LM Studio, LocalAI, vLLM, etc. A browser cannot call a local server that has no CORS headers - local <code className="text-blue-300 font-mono">http://localhost:...</code> URLs are rerouted through the Vite proxy automatically, or set the Base URL to <code className="text-blue-300 font-mono">/llm-proxy/v1</code> explicitly.</p>
+                  <p className="text-[10px] text-ink-3 mt-1">Supports OpenAI, OpenRouter, Ollama, LM Studio, LocalAI, vLLM, etc. A browser cannot call a local server that has no CORS headers - local <code className="text-brand font-mono">http://localhost:...</code> URLs are rerouted through the Vite proxy automatically, or set the Base URL to <code className="text-brand font-mono">/llm-proxy/v1</code> explicitly.</p>
                 </div>
               )}
 
               {/* API Key */}
               <div>
-                <label className="block text-slate-300 mb-1 font-medium flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-amber-400" /> API Key
+                <label className="block text-ink-2 mb-1 font-medium flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-warn" /> API Key
                 </label>
                 <input
                   type="password"
                   placeholder={provider === 'openai_compatible' ? "sk-..." : "Gemini API Key..."}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink font-mono focus:outline-none focus:border-brand"
                 />
               </div>
 
               {/* Model ID */}
               <div>
-                <label className="block text-slate-300 mb-1 font-medium flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-emerald-400" /> Model ID
+                <label className="block text-ink-2 mb-1 font-medium flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-ok" /> Model ID
                 </label>
                 <input
                   type="text"
                   placeholder={provider === 'openai_compatible' ? "e.g. gpt-4o-mini, llama-3.1-8b, claude-3-5-sonnet" : "e.g. gemini-3-flash-preview"}
                   value={modelId}
                   onChange={(e) => setModelId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink font-mono focus:outline-none focus:border-brand"
                 />
               </div>
 
               {/* Hyperparameters Grid */}
               <div className="grid grid-cols-3 gap-3 pt-1">
                 <div>
-                  <label className="block text-slate-400 mb-1">Temperature ({temperature})</label>
+                  <label className="block text-ink-3 mb-1">Temperature ({temperature})</label>
                   <input
                     type="range"
                     min="0.0"
@@ -1423,11 +1469,11 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     step="0.05"
                     value={temperature}
                     onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                    className="w-full accent-blue-500"
+                    className="w-full accent-brand"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Top P ({topP})</label>
+                  <label className="block text-ink-3 mb-1">Top P ({topP})</label>
                   <input
                     type="range"
                     min="0.1"
@@ -1435,27 +1481,27 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     step="0.05"
                     value={topP}
                     onChange={(e) => setTopP(parseFloat(e.target.value))}
-                    className="w-full accent-emerald-500"
+                    className="w-full accent-ok"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Max Tokens</label>
+                  <label className="block text-ink-3 mb-1">Max Tokens</label>
                   <input
                     type="number"
                     value={maxTokens}
                     onChange={(e) => setMaxTokens(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full bg-surface-2 border border-line rounded-lg px-2.5 py-1.5 text-ink font-mono focus:outline-none focus:border-brand"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-line">
               <div className="text-[11px] leading-snug min-h-[16px]">
                 {llmTest === null ? (
-                  <span className="text-slate-500">Connection not tested yet.</span>
+                  <span className="text-ink-4">Connection not tested yet.</span>
                 ) : llmTest.state === 'testing' ? (
-                  <span className="text-blue-300 flex items-center gap-1.5">
+                  <span className="text-brand flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 animate-spin" />
                     {llmTest.message}
                   </span>
@@ -1463,10 +1509,10 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   <span
                     className={
                       llmTest.state === 'ok'
-                        ? 'text-emerald-400'
+                        ? 'text-ok'
                         : llmTest.state === 'warn'
-                        ? 'text-amber-400'
-                        : 'text-red-400'
+                        ? 'text-warn'
+                        : 'text-danger'
                     }
                   >
                     {llmTest.state === 'ok' ? (
@@ -1477,7 +1523,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     {llmTest.message}
                   </span>
                 )}
-                <div className="text-[10px] text-slate-500 mt-0.5">
+                <div className="text-[10px] text-ink-4 mt-0.5">
                   Saved in this browser and restored after a refresh.
                 </div>
               </div>
@@ -1487,7 +1533,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   type="button"
                   onClick={handleResetLlmSettings}
                   title="Forget the settings saved in this browser and restore the defaults"
-                  className="text-slate-400 hover:text-white hover:bg-slate-800 px-2.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                  className="text-ink-3 hover:text-ink hover:bg-surface-2 px-2.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Reset</span>
@@ -1498,10 +1544,10 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   onClick={handleTestLlmConnection}
                   disabled={llmTest?.state === 'testing'}
                   title="Send one small request to the configured LLM and report the result"
-                  className="bg-slate-800/80 hover:bg-slate-700 disabled:opacity-50 text-slate-200 border border-slate-700 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+                  className="bg-surface-2/80 hover:bg-surface-3 disabled:opacity-50 text-ink border border-line px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
                 >
                   <Activity
-                    className={`w-3.5 h-3.5 text-emerald-400 ${llmTest?.state === 'testing' ? 'animate-spin' : ''}`}
+                    className={`w-3.5 h-3.5 text-ok ${llmTest?.state === 'testing' ? 'animate-spin' : ''}`}
                   />
                   <span>{llmTest?.state === 'testing' ? 'Testing...' : 'Test Connection'}</span>
                 </button>
@@ -1509,7 +1555,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 <button
                   type="button"
                   onClick={() => setShowSettingsModal(false)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg font-semibold text-xs transition"
+                  className="bg-brand-strong hover:bg-brand-strong text-on-brand px-5 py-2 rounded-lg font-semibold text-xs transition"
                 >
                   Save & Apply Settings
                 </button>
@@ -1523,49 +1569,49 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
       {appState === 'simulating' && (
         <div className="flex-1 grid grid-cols-12 overflow-hidden min-h-0">
           {/* LEFT SIDEBAR: Passenger Profile & Telemetry */}
-          <div className="col-span-3 bg-slate-800/50 border-r border-slate-800 p-4 flex flex-col space-y-4 overflow-y-auto min-h-0">
+          <div className="col-span-3 bg-surface-2/50 border-r border-line p-4 flex flex-col space-y-4 overflow-y-auto min-h-0">
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-blue-400" /> Passenger Information
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3 mb-2 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-brand" /> Passenger Information
               </h3>
-              <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-2 text-xs">
-                <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                  <span className="text-slate-400">Name</span>
-                  <span className="font-bold text-white">{selectedScenario.passenger}</span>
+              <div className="bg-surface/90 border border-line/80 rounded-xl p-3 space-y-2 text-xs">
+                <div className="flex justify-between border-b border-line pb-1.5">
+                  <span className="text-ink-3">Name</span>
+                  <span className="font-bold text-ink">{selectedScenario.passenger}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                  <span className="text-slate-400">PNR Reference</span>
-                  <span className="font-mono font-bold text-amber-400">{selectedScenario.pnr}</span>
+                <div className="flex justify-between border-b border-line pb-1.5">
+                  <span className="text-ink-3">PNR Reference</span>
+                  <span className="font-mono font-bold text-warn">{selectedScenario.pnr}</span>
                 </div>
-                <div className="flex justify-between border-b border-slate-800 pb-1.5">
-                  <span className="text-slate-400">Flight No.</span>
-                  <span className="font-mono text-slate-200">{selectedScenario.flight}</span>
+                <div className="flex justify-between border-b border-line pb-1.5">
+                  <span className="text-ink-3">Flight No.</span>
+                  <span className="font-mono text-ink">{selectedScenario.flight}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Difficulty</span>
-                  <span className="font-bold text-emerald-400">{selectedScenario.difficulty}</span>
+                  <span className="text-ink-3">Difficulty</span>
+                  <span className="font-bold text-ok">{selectedScenario.difficulty}</span>
                 </div>
               </div>
             </div>
 
             {/* Live Connected KPI Metrics Panel */}
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-emerald-400" /> Live Operational Metrics
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3 mb-2 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-ok" /> Live Operational Metrics
               </h3>
-              <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl p-3 space-y-3">
+              <div className="bg-surface/90 border border-line/80 rounded-xl p-3 space-y-3">
                 {/* Customer Patience Bar */}
                 <div>
                   <div className="flex justify-between text-[11px] mb-1">
-                    <span className="text-slate-400 font-medium">Customer Patience</span>
+                    <span className="text-ink-3 font-medium">Customer Patience</span>
                     <span className={`font-mono font-bold ${
-                      customerPatience > 60 ? 'text-emerald-400' : customerPatience > 30 ? 'text-amber-400' : 'text-red-400'
+                      customerPatience > 60 ? 'text-ok' : customerPatience > 30 ? 'text-warn' : 'text-danger'
                     }`}>{Math.round(customerPatience)}%</span>
                   </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-surface-2 h-2 rounded-full overflow-hidden">
                     <div 
                       className={`h-full transition-all duration-300 ${
-                        customerPatience > 60 ? 'bg-emerald-400' : customerPatience > 30 ? 'bg-amber-400' : 'bg-red-400'
+                        customerPatience > 60 ? 'bg-ok' : customerPatience > 30 ? 'bg-warn' : 'bg-danger'
                       }`}
                       style={{ width: `${customerPatience}%` }}
                     ></div>
@@ -1574,26 +1620,26 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
                 {/* Metric Grid */}
                 <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                  <div className="bg-slate-800/80 p-2 rounded border border-slate-700/60">
-                    <p className="text-[10px] text-slate-400">Typing Speed</p>
-                    <p className="text-sm font-bold font-mono text-blue-400">{liveWpm} WPM</p>
+                  <div className="bg-surface-2/80 p-2 rounded border border-line/60">
+                    <p className="text-[10px] text-ink-3">Typing Speed</p>
+                    <p className="text-sm font-bold font-mono text-brand">{liveWpm} WPM</p>
                   </div>
-                  <div className="bg-slate-800/80 p-2 rounded border border-slate-700/60">
-                    <p className="text-[10px] text-slate-400">SLA Violations</p>
-                    <p className={`text-sm font-bold font-mono ${responseViolations > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                  <div className="bg-surface-2/80 p-2 rounded border border-line/60">
+                    <p className="text-[10px] text-ink-3">SLA Violations</p>
+                    <p className={`text-sm font-bold font-mono ${responseViolations > 0 ? 'text-danger' : 'text-ok'}`}>
                       {responseViolations}
                     </p>
                   </div>
-                  <div className="bg-slate-800/80 p-2 rounded border border-slate-700/60">
-                    <p className="text-[10px] text-slate-400">Holds Count</p>
-                    <p className="text-sm font-bold font-mono text-slate-200">{holdCount}</p>
+                  <div className="bg-surface-2/80 p-2 rounded border border-line/60">
+                    <p className="text-[10px] text-ink-3">Holds Count</p>
+                    <p className="text-sm font-bold font-mono text-ink">{holdCount}</p>
                   </div>
-                  <div className="bg-slate-800/80 p-2 rounded border border-slate-700/60">
-                    <p className="text-[10px] text-slate-400">Sentiment</p>
+                  <div className="bg-surface-2/80 p-2 rounded border border-line/60">
+                    <p className="text-[10px] text-ink-3">Sentiment</p>
                     <p className={`text-xs font-bold mt-0.5 flex items-center gap-1 ${
-                      customerSentiment === 'Angry' ? 'text-red-400' :
-                      customerSentiment === 'Anxious' ? 'text-amber-400' :
-                      customerSentiment === 'Satisfied' ? 'text-emerald-400' : 'text-slate-300'
+                      customerSentiment === 'Angry' ? 'text-danger' :
+                      customerSentiment === 'Anxious' ? 'text-warn' :
+                      customerSentiment === 'Satisfied' ? 'text-ok' : 'text-ink-2'
                     }`}>
                       {customerSentiment === 'Angry' && <Frown className="w-3.5 h-3.5" />}
                       {customerSentiment === 'Anxious' && <Meh className="w-3.5 h-3.5" />}
@@ -1611,8 +1657,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 onClick={handleToggleHold}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition border ${
                   isOnHold
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500 shadow-md'
-                    : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40'
+                    ? 'bg-warn-strong hover:bg-warn-strong text-on-brand border-warn shadow-md'
+                    : 'bg-surface-2 hover:bg-surface-3 text-warn border-warn/30'
                 }`}
               >
                 {isOnHold ? <Play className="w-3.5 h-3.5 fill-current" /> : <PauseCircle className="w-3.5 h-3.5" />}
@@ -1621,28 +1667,28 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             </div>
 
             {/* Live Impact Event Log */}
-            <div className="flex-1 flex flex-col min-h-0 border-t border-slate-800 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><History className="w-3.5 h-3.5 text-amber-400" /> Live Impact Audit</span>
-                <span className="text-[10px] font-mono text-slate-500">{eventLog.length} events</span>
+            <div className="flex-1 flex flex-col min-h-0 border-t border-line pt-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3 mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5"><History className="w-3.5 h-3.5 text-warn" /> Live Impact Audit</span>
+                <span className="text-[10px] font-mono text-ink-4">{eventLog.length} events</span>
               </h3>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-[11px] min-h-0 custom-scrollbar">
                 {eventLog.map((ev) => (
                   <div 
                     key={ev.id} 
                     className={`p-2 rounded border flex items-start justify-between gap-2 ${
-                      ev.delta > 0 ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-200' :
-                      ev.delta < 0 ? 'bg-red-950/30 border-red-800/40 text-red-200' :
-                      'bg-slate-900/60 border-slate-800 text-slate-300'
+                      ev.delta > 0 ? 'bg-ok/10 border-ok/30 text-ok' :
+                      ev.delta < 0 ? 'bg-danger/10 border-danger/30 text-danger' :
+                      'bg-surface/60 border-line text-ink-2'
                     }`}
                   >
                     <div>
                       <p className="font-medium leading-tight">{ev.label}</p>
-                      <span className="text-[9px] text-slate-400 font-mono">{ev.timestamp}</span>
+                      <span className="text-[9px] text-ink-3 font-mono">{ev.timestamp}</span>
                     </div>
                     {ev.delta !== 0 && (
                       <span className={`font-mono font-black text-xs px-1.5 py-0.5 rounded ${
-                        ev.delta > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        ev.delta > 0 ? 'bg-ok/15 text-ok' : 'bg-danger/15 text-danger'
                       }`}>
                         {ev.delta > 0 ? `+${ev.delta}` : ev.delta}
                       </span>
@@ -1654,13 +1700,13 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           </div>
 
           {/* CENTER PANEL: Live Chat Workspace */}
-          <div className="col-span-6 flex flex-col bg-slate-900 border-r border-slate-800 relative min-h-0">
-            <div className="bg-slate-800/40 border-b border-slate-800 px-4 py-2 flex items-center justify-between shrink-0">
+          <div className="col-span-6 flex flex-col bg-surface border-r border-line relative min-h-0">
+            <div className="bg-surface-2/40 border-b border-line px-4 py-2 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span className="text-xs font-bold text-slate-200">Live Agent Workspace</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-ok animate-pulse"></div>
+                <span className="text-xs font-bold text-ink">Live Agent Workspace</span>
               </div>
-              <span className="text-xs text-slate-400 font-mono">Chat ID: #RY-{Math.floor(100000 + Math.random() * 900000)}</span>
+              <span className="text-xs text-ink-3 font-mono">Chat ID: #RY-{Math.floor(100000 + Math.random() * 900000)}</span>
             </div>
 
             <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto space-y-3 min-h-0">
@@ -1673,14 +1719,16 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                     className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
                       msg.sender === 'agent'
                         ? msg.isHoldNotice
-                          ? 'bg-amber-950/80 border border-amber-700/60 text-amber-100 rounded-br-none'
-                          : 'bg-[#073590] text-white rounded-br-none'
+                          ? 'bg-warn/20 border border-warn/30 text-warn rounded-br-none'
+                          : 'bg-brand text-on-brand rounded-br-none'
                         : msg.isSystemAlert
-                        ? 'bg-red-950/80 border border-red-700 text-red-200 rounded-bl-none'
-                        : 'bg-slate-800 text-slate-100 rounded-bl-none border border-slate-700'
+                        ? 'bg-danger/20 border border-danger text-danger rounded-bl-none'
+                        : 'bg-surface-2 text-ink rounded-bl-none border border-line'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-slate-400/80 mb-1 font-semibold gap-3">
+                    <div className={`flex items-center justify-between text-[10px] mb-1 font-semibold gap-3 ${
+                      msg.sender === 'agent' && !msg.isHoldNotice ? 'text-on-brand/70' : 'text-ink-3'
+                    }`}>
                       <span>{msg.sender === 'agent' ? 'You (Agent)' : selectedScenario.passenger}</span>
                       <span>{msg.timestamp}</span>
                     </div>
@@ -1691,47 +1739,47 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
               {isLoadingAi && (
                 <div className="flex items-start">
-                  <div className="bg-slate-800 text-slate-400 rounded-2xl px-4 py-3 text-xs border border-slate-700 flex items-center space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
-                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:0.2s]"></div>
-                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce [animation-delay:0.4s]"></div>
-                    <span className="text-[10px] text-slate-400 ml-1">Customer is replying...</span>
+                  <div className="bg-surface-2 text-ink-3 rounded-2xl px-4 py-3 text-xs border border-line flex items-center space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-brand animate-bounce"></div>
+                    <div className="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-2 h-2 rounded-full bg-brand animate-bounce [animation-delay:0.4s]"></div>
+                    <span className="text-[10px] text-ink-3 ml-1">Customer is replying...</span>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Quick Macro Buttons */}
-            <div className="bg-slate-800/30 border-t border-slate-800 p-2 flex items-center space-x-2 overflow-x-auto text-[11px] shrink-0">
-              <span className="text-slate-500 font-semibold text-[10px] uppercase pl-1">Macros:</span>
+            <div className="bg-surface-2/30 border-t border-line p-2 flex items-center space-x-2 overflow-x-auto text-[11px] shrink-0">
+              <span className="text-ink-4 font-semibold text-[10px] uppercase pl-1">Macros:</span>
               <button
                 onClick={() => handleInsertCanned("Thank you for contacting Ryanair support. Allow me a moment to look into your booking details.")}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 whitespace-nowrap"
+                className="bg-surface-2 hover:bg-surface-3 text-ink-2 px-2.5 py-1 rounded border border-line whitespace-nowrap"
               >
                 Greeting
               </button>
               <button
                 onClick={() => handleInsertCanned("As per Ryanair digital policy, minor name spelling corrections within 24 hours can be completed free of charge directly on the Ryanair app or website. Have you tried doing this through your account?")}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 whitespace-nowrap text-amber-300 border-amber-500/40"
+                className="bg-warn/10 hover:bg-warn/20 text-warn font-semibold px-2.5 py-1 rounded border border-warn/30 whitespace-nowrap transition"
               >
                 Push Self-Service
               </button>
               <button
                 onClick={() => handleInsertCanned("In order for us to process this change manually on our end, please provide a screenshot or proof of the error you encountered while attempting self-service on the website or app.")}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 whitespace-nowrap"
+                className="bg-surface-2 hover:bg-surface-3 text-ink-2 px-2.5 py-1 rounded border border-line whitespace-nowrap"
               >
                 Request Proof
               </button>
               <button
                 onClick={() => handleInsertCanned("According to Ryanair baggage policy, small personal bags must fit within 40x20x25cm.")}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded border border-slate-700 whitespace-nowrap"
+                className="bg-surface-2 hover:bg-surface-3 text-ink-2 px-2.5 py-1 rounded border border-line whitespace-nowrap"
               >
                 Cabin Bag Rule
               </button>
             </div>
 
             {/* Input Composer (Shift+Enter for newline, Enter to send) */}
-            <div className="p-3 bg-slate-800/80 border-t border-slate-800 flex items-center space-x-2 shrink-0">
+            <div className="p-3 bg-surface-2/80 border-t border-line flex items-center space-x-2 shrink-0">
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -1743,12 +1791,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 }}
                 rows={2}
                 placeholder={isOnHold ? "Customer is on hold. Type a message or click Resume..." : "Type response to customer... (Enter to send, Shift+Enter for newline)"}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition resize-none"
+                className="flex-1 bg-surface border border-line rounded-xl px-4 py-2.5 text-xs text-ink placeholder-ink-4 focus:outline-none focus:border-brand transition resize-none"
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isLoadingAi}
-                className="bg-[#073590] hover:bg-blue-600 disabled:opacity-50 text-white p-3 rounded-xl transition flex items-center justify-center shadow"
+                className="bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand p-3 rounded-xl transition flex items-center justify-center shadow"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -1756,36 +1804,36 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           </div>
 
           {/* RIGHT SIDEBAR: Ryanair Knowledge Base */}
-          <div className="col-span-3 bg-slate-800/60 border-l border-slate-800 p-4 flex flex-col space-y-3 overflow-hidden">
+          <div className="col-span-3 bg-surface-2/60 border-l border-line p-4 flex flex-col space-y-3 overflow-hidden">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-amber-400" /> Ryanair SOP Search
+              <h3 className="text-xs font-bold uppercase tracking-wider text-ink-2 flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-warn" /> Ryanair SOP Search
               </h3>
             </div>
 
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-ink-3" />
               <input
                 type="text"
                 placeholder="Search policy (e.g., baggage, fee, delay)..."
                 value={sopSearch}
                 onChange={(e) => setSopSearch(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full bg-surface border border-line rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink placeholder-ink-4 focus:outline-none focus:border-warn"
               />
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
               {filteredSop.map((sop, idx) => (
-                <div key={idx} className="bg-slate-900/90 border border-slate-700/80 rounded-lg p-3 text-xs space-y-1 hover:border-amber-500/50 transition">
+                <div key={idx} className="bg-surface/90 border border-line/80 rounded-lg p-3 text-xs space-y-1 hover:border-warn/50 transition">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide">{sop.category}</span>
+                    <span className="text-[10px] font-bold text-warn uppercase tracking-wide">{sop.category}</span>
                   </div>
-                  <h4 className="font-bold text-slate-200">{sop.title}</h4>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">{sop.content}</p>
+                  <h4 className="font-bold text-ink">{sop.title}</h4>
+                  <p className="text-[11px] text-ink-3 leading-relaxed">{sop.content}</p>
                 </div>
               ))}
               {filteredSop.length === 0 && (
-                <p className="text-xs text-slate-500 text-center py-4">No matching Ryanair policy found.</p>
+                <p className="text-xs text-ink-4 text-center py-4">No matching Ryanair policy found.</p>
               )}
             </div>
           </div>
@@ -1797,23 +1845,23 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
         <div className="flex-1 max-w-4xl mx-auto w-full p-6 flex flex-col justify-start overflow-y-auto min-h-0 my-auto custom-scrollbar">
           {isEvaluating ? (
             <div className="text-center py-12 space-y-4">
-              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <h3 className="text-xl font-bold text-white">Consolidating Connected KPI Audit & AI Policy Evaluation...</h3>
-              <p className="text-xs text-slate-400">Analyzing total handling time, typing velocity, live quality score, and Ryanair digital policy compliance.</p>
+              <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <h3 className="text-xl font-bold text-ink">Consolidating Connected KPI Audit & AI Policy Evaluation...</h3>
+              <p className="text-xs text-ink-3">Analyzing total handling time, typing velocity, live quality score, and Ryanair digital policy compliance.</p>
             </div>
           ) : scorecard ? (
-            <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-700 pb-5">
+            <div className="bg-surface-2/80 border border-line rounded-2xl p-6 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between border-b border-line pb-5">
                 <div>
-                  <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Performance Evaluation Scorecard</span>
-                  <h2 className="text-2xl font-black text-white mt-0.5">Session Resolution Audit</h2>
+                  <span className="text-xs font-bold text-brand uppercase tracking-widest">Performance Evaluation Scorecard</span>
+                  <h2 className="text-2xl font-black text-ink mt-0.5">Session Resolution Audit</h2>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="text-right">
-                    <p className="text-[10px] text-slate-400 uppercase">Overall Grade</p>
-                    <p className="text-xs font-semibold text-slate-300">Ryanair CS Standard</p>
+                    <p className="text-[10px] text-ink-3 uppercase">Overall Grade</p>
+                    <p className="text-xs font-semibold text-ink-2">Ryanair CS Standard</p>
                   </div>
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center font-black text-2xl text-amber-300 shadow-lg border border-blue-400/30">
+                  <div className="w-14 h-14 bg-gradient-to-br from-brand to-brand-strong rounded-xl flex items-center justify-center font-black text-2xl text-warn shadow-lg border border-brand/30">
                     {scorecard.grade}
                   </div>
                 </div>
@@ -1821,73 +1869,73 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
               {/* Connected Performance Score Banner */}
               <div className="grid grid-cols-4 gap-3">
-                <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-700 text-center">
-                  <p className="text-[10px] text-slate-400 font-medium uppercase">Accumulated Quality Score</p>
-                  <p className={`text-2xl font-black mt-1 ${scorecard.finalLiveScore >= 80 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <div className="bg-surface/90 p-3.5 rounded-xl border border-line text-center">
+                  <p className="text-[10px] text-ink-3 font-medium uppercase">Accumulated Quality Score</p>
+                  <p className={`text-2xl font-black mt-1 ${scorecard.finalLiveScore >= 80 ? 'text-ok' : 'text-warn'}`}>
                     {scorecard.finalLiveScore}%
                   </p>
                 </div>
-                <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-700 text-center">
-                  <p className="text-[10px] text-slate-400 font-medium uppercase">SOP Policy Accuracy</p>
-                  <p className="text-2xl font-black text-emerald-400 mt-1">{scorecard.sopAccuracy}%</p>
+                <div className="bg-surface/90 p-3.5 rounded-xl border border-line text-center">
+                  <p className="text-[10px] text-ink-3 font-medium uppercase">SOP Policy Accuracy</p>
+                  <p className="text-2xl font-black text-ok mt-1">{scorecard.sopAccuracy}%</p>
                 </div>
-                <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-700 text-center">
-                  <p className="text-[10px] text-slate-400 font-medium uppercase">Communication & Tone</p>
-                  <p className="text-2xl font-black text-blue-400 mt-1">{scorecard.communicationScore}%</p>
+                <div className="bg-surface/90 p-3.5 rounded-xl border border-line text-center">
+                  <p className="text-[10px] text-ink-3 font-medium uppercase">Communication & Tone</p>
+                  <p className="text-2xl font-black text-brand mt-1">{scorecard.communicationScore}%</p>
                 </div>
-                <div className="bg-slate-900/90 p-3.5 rounded-xl border border-slate-700 text-center">
-                  <p className="text-[10px] text-slate-400 font-medium uppercase">SLA & Timing</p>
-                  <p className={`text-2xl font-black mt-1 ${scorecard.violations === 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="bg-surface/90 p-3.5 rounded-xl border border-line text-center">
+                  <p className="text-[10px] text-ink-3 font-medium uppercase">SLA & Timing</p>
+                  <p className={`text-2xl font-black mt-1 ${scorecard.violations === 0 ? 'text-ok' : 'text-danger'}`}>
                     {scorecard.timeSlaScore}%
                   </p>
                 </div>
               </div>
 
               {/* Operational Telemetry Summary */}
-              <div className="grid grid-cols-4 gap-3 bg-slate-900/50 p-3 rounded-xl text-xs text-slate-300">
+              <div className="grid grid-cols-4 gap-3 bg-surface/50 p-3 rounded-xl text-xs text-ink-2">
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Total Handling Time:</span>
+                  <span className="text-ink-4 block text-[10px]">Total Handling Time:</span>
                   <span className="font-mono font-bold">{scorecard.handlingTime}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Typing Velocity:</span>
-                  <span className="font-mono font-bold text-blue-400">{scorecard.wpm} WPM</span>
+                  <span className="text-ink-4 block text-[10px]">Typing Velocity:</span>
+                  <span className="font-mono font-bold text-brand">{scorecard.wpm} WPM</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">2-Min Violations:</span>
-                  <span className={`font-mono font-bold ${scorecard.violations > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                  <span className="text-ink-4 block text-[10px]">2-Min Violations:</span>
+                  <span className={`font-mono font-bold ${scorecard.violations > 0 ? 'text-danger' : 'text-ok'}`}>
                     {scorecard.violations}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Customer Holds:</span>
+                  <span className="text-ink-4 block text-[10px]">Customer Holds:</span>
                   <span className="font-mono font-bold">{scorecard.holds}</span>
                 </div>
               </div>
 
-              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 space-y-2">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-surface/80 p-4 rounded-xl border border-line space-y-2">
+                <h4 className="text-xs font-bold text-warn uppercase tracking-wider flex items-center gap-1.5">
                   <Award className="w-4 h-4" /> Operations Audit Summary
                 </h4>
-                <p className="text-xs text-slate-300 leading-relaxed">{scorecard.summary}</p>
+                <p className="text-xs text-ink-2 leading-relaxed">{scorecard.summary}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="bg-emerald-950/20 border border-emerald-800/40 p-4 rounded-xl space-y-2">
-                  <h4 className="font-bold text-emerald-400 flex items-center gap-1.5">
+                <div className="bg-ok/10 border border-ok/30 p-4 rounded-xl space-y-2">
+                  <h4 className="font-bold text-ok flex items-center gap-1.5">
                     <CheckCircle className="w-4 h-4" /> Key Strengths
                   </h4>
-                  <ul className="space-y-1 text-slate-300 list-disc list-inside">
+                  <ul className="space-y-1 text-ink-2 list-disc list-inside">
                     {scorecard.strengths?.map((s, i) => (
                       <li key={i}>{s}</li>
                     ))}
                   </ul>
                 </div>
-                <div className="bg-amber-950/20 border border-amber-800/40 p-4 rounded-xl space-y-2">
-                  <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
+                <div className="bg-warn/10 border border-warn/30 p-4 rounded-xl space-y-2">
+                  <h4 className="font-bold text-warn flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4" /> Areas to Improve
                   </h4>
-                  <ul className="space-y-1 text-slate-300 list-disc list-inside">
+                  <ul className="space-y-1 text-ink-2 list-disc list-inside">
                     {scorecard.improvements?.map((imp, i) => (
                       <li key={i}>{imp}</li>
                     ))}
@@ -1898,7 +1946,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               <div className="flex items-center justify-end space-x-3 pt-3">
                 <button
                   onClick={() => setAppState('setup')}
-                  className="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5"
+                  className="bg-surface-3 hover:bg-surface-3 text-ink font-semibold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Start New Simulation</span>

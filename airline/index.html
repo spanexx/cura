@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ryanair Agent Simulator</title>
+    <script>
+      // Apply the saved theme before first paint so the app never flashes the
+      // wrong palette. Dark is the default; 'light' is the only override.
+      (function () {
+        try {
+          var saved = window.localStorage.getItem('ryanair-agent-simulator.theme');
+          var isDark = saved !== 'light';
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
