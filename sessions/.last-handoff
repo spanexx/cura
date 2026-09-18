@@ -8,6 +8,8 @@
 - `index.html`: inline pre-paint script applies the saved theme so there is no wrong-palette flash.
 - `App.jsx`: theme state + effect (apply + persist), Sun/Moon toggle in the header; header restyled to a surface bar with a brand logo mark and a gold accent hairline; setup hero with capability chips; case cards `rounded-2xl` with hover lift and a selected ring/check; KpiTile + dashboard panel + empty states restyled; chat message meta contrast fixed; conflicting macro-button classes cleaned up; `selectedScenario` reads in the setup screen are now optional-chained.
 - All ~140 raw colour utilities were migrated by a one-shot codemod (459 rewrites, 0 unmapped, 0 leftovers); the codemod was deleted after use.
+- Responsiveness pass: root uses `h-dvh`; header wraps (brand row + KPI HUD strip that scrolls horizontally on narrow screens); the 3-panel workspace collapses to a Case/Chat/Policy pane switcher below `lg` (columns are `lg:col-span-*` only, so the mobile 1-column grid cannot be squeezed); setup and scorecard screens scroll safely instead of clipping (`my-auto` pattern instead of `justify-center` + overflow); modals are capped at `max-h-[92dvh]` with internal scroll and single-column forms on phones; cards/scorecard grids step down at `sm`/`md`/`lg`/`xl`; buttons go full-width on phones.
+- Verified after the responsiveness pass: build OK, `MISSING: 0` (315 utilities), SSR smoke 12/12, and an audit confirming zero unprefixed `col-span-*` / `grid-cols-{3+}` remain.
 
 ## Verification performed
 - `npm run build` passes.
@@ -17,7 +19,7 @@
 - Built CSS contains both `:root` and `.dark` token blocks and 85 `rgb(var(--c-*))` references; `dist/index.html` carries the pre-paint script.
 
 ## Known gaps / next steps
-- The light theme was verified structurally, not visually: toggle it and eyeball every screen (setup, chat, modals, scorecard).
+- The light theme and the responsive breakpoints were verified structurally, not visually: toggle the theme and resize the window through ~360 / 768 / 1024 / 1440px, checking the setup screen, chat panes, both modals and the scorecard.
 - Temp verifiers were deleted; consider permanent tests for `theme.js` and the palette mapping.
 - `App.jsx` is still a ~1950-line monolith: extracting SetupScreen / ChatView / KpiSidebar / Scorecard / Modals is the natural next refactor, behaviour-identical.
 - Stray legacy files still tracked: `airline/scripts/extract-llm.mjs`, `airline/tests/llm.test.js`.

@@ -119,6 +119,9 @@ export default function App() {
   // Persistent KPI history shown on the home-screen dashboard.
   const [sessionHistory, setSessionHistory] = useState(loadSessionHistory);
   const [showHistoryList, setShowHistoryList] = useState(false);
+
+  // On screens too narrow for three columns, the workspace shows one pane at a time.
+  const [activePane, setActivePane] = useState('chat'); // 'case' | 'chat' | 'policy'
   
   // Custom LLM Configuration (restored from the browser on load - see ./settings.js)
   const [provider, setProvider] = useState(SAVED_LLM_SETTINGS.provider); // 'gemini' | 'openai_compatible'
@@ -945,10 +948,10 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
   const slaCleanRate = totalSessions ? Math.round((sessionHistory.filter((e) => e.violations === 0).length / totalSessions) * 100) : 0;
 
   return (
-    <div className="h-screen bg-canvas text-ink font-sans flex flex-col overflow-hidden">
+    <div className="h-dvh bg-canvas text-ink font-sans flex flex-col overflow-hidden">
       {/* HEADER BAR WITH LIVE CONNECTED KPI HUD */}
-      <header className="bg-surface border-b border-line px-5 py-2.5 flex items-center justify-between gap-4 shadow-sm shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+      <header className="bg-surface border-b border-line px-3 sm:px-5 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 shadow-sm shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="bg-brand text-on-brand p-2 rounded-xl shadow-sm shrink-0">
             <Plane className="w-5 h-5 fill-current rotate-45" />
           </div>
@@ -957,11 +960,11 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               <span className="truncate">Ryanair Agent Simulator</span>
               <span className="hidden sm:inline text-[9px] font-bold uppercase tracking-wider text-brand bg-brand/10 border border-brand/30 px-1.5 py-0.5 rounded shrink-0">KPI Lab</span>
             </h1>
-            <p className="text-[11px] text-ink-3">Interconnected Performance Engine</p>
+            <p className="hidden sm:block text-[11px] text-ink-3">Interconnected Performance Engine</p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setTheme((prev) => nextTheme(prev))}
             className="bg-surface-2 hover:bg-surface-3 text-ink-2 hover:text-ink border border-line p-2 rounded-lg transition shrink-0"
@@ -980,16 +983,16 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             title="Configure LLM Endpoint & Parameters"
           >
             <Settings className="w-3.5 h-3.5 text-warn" />
-            <span>LLM Settings</span>
-            <span className="text-[10px] bg-surface px-1.5 py-0.5 rounded font-mono text-brand">
+            <span className="hidden md:inline">LLM Settings</span>
+            <span className="hidden lg:inline text-[10px] bg-surface px-1.5 py-0.5 rounded font-mono text-brand">
               {provider === 'openai_compatible' ? 'OpenAI Compatible' : 'Gemini'}
             </span>
           </button>
 
           {appState === 'simulating' && (
-            <div className="flex items-center space-x-5">
+            <div className="order-last w-full xl:order-none xl:w-auto flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 pb-0.5 sm:pb-0">
               {/* Live Interconnected Quality Rating */}
-              <div className="flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
+              <div className="shrink-0 flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
                 <Gauge className="w-4 h-4 text-ok" />
                 <div>
                   <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Live Quality Score</p>
@@ -1012,7 +1015,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* 15-Min Handling Clock */}
-              <div className="flex items-center space-x-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-line">
+              <div className="shrink-0 flex items-center space-x-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-line">
                 <Clock className={`w-4 h-4 ${totalSeconds < 180 ? 'text-danger animate-pulse' : 'text-brand'}`} />
                 <div>
                   <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Target Resolution</p>
@@ -1023,7 +1026,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* 2-Min Response Window Clock */}
-              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all ${
+              <div className={`shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all ${
                 isOnHold 
                   ? 'bg-warn/15 border-warn/30 text-warn' 
                   : responseSeconds < 30 
@@ -1041,16 +1044,17 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 </div>
               </div>
 
-              <span className="text-[10px] font-mono bg-ok/15 text-ok border border-ok/30 px-2 py-1 rounded">
+              <span className="shrink-0 text-[10px] font-mono bg-ok/15 text-ok border border-ok/30 px-2 py-1 rounded">
                 {isPracticeMode ? 'PRACTICE OFFLINE' : 'AI CONNECTED'}
               </span>
 
               <button
                 onClick={() => handleEndSession('Agent Manually Resolved')}
-                className="bg-ok-strong hover:bg-ok text-on-brand px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition"
+                className="shrink-0 bg-ok-strong hover:bg-ok text-on-brand px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition"
               >
                 <CheckCircle className="w-4 h-4" />
-                <span>Resolve Chat</span>
+                <span className="hidden sm:inline">Resolve Chat</span>
+                <span className="sm:hidden">Resolve</span>
               </button>
             </div>
           )}
@@ -1061,19 +1065,19 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {/* API ERROR BANNER */}
       {apiError && (
-        <div className="bg-danger/20 border-b border-danger px-4 py-2 text-xs text-danger flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-danger" />
-            <span className="font-medium">{apiError}</span>
+        <div className="bg-danger/20 border-b border-danger px-3 sm:px-4 py-2 text-xs text-danger flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center space-x-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
+            <span className="font-medium break-words">{apiError}</span>
           </div>
-          <button onClick={() => setApiError(null)} className="text-danger hover:text-ink font-bold text-xs">Dismiss</button>
+          <button onClick={() => setApiError(null)} className="text-danger hover:text-ink font-bold text-xs shrink-0">Dismiss</button>
         </div>
       )}
 
       {}
       {/* HOME-SCREEN KPI DASHBOARD (persistent across refreshes) */}
       {appState === 'setup' && (
-        <div className="max-w-5xl mx-auto w-full px-6 pt-6">
+        <div className="max-w-5xl mx-auto w-full px-3 sm:px-6 pt-4 sm:pt-6">
           <div className="rounded-2xl bg-surface border border-line p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -1139,7 +1143,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
       )}
 
       {appState === 'setup' && (
-        <div className="flex-1 max-w-5xl mx-auto w-full p-6 flex flex-col justify-center overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar flex flex-col">
+          <div className="max-w-5xl mx-auto w-full p-3 sm:p-6 my-auto">
           <div className="text-center mb-7">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand bg-brand/10 border border-brand/30 px-2.5 py-1 rounded-full mb-3">
               <Sparkles className="w-3 h-3" /> Case Library
@@ -1166,7 +1171,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               <button
                 onClick={handleGenerateAiScenario}
                 disabled={isGeneratingScenario}
-                className="bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-brand/30 flex items-center space-x-2 transition"
+                className="w-full sm:w-auto justify-center bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-brand/30 flex items-center space-x-2 transition"
               >
                 <Zap className={`w-4 h-4 text-warn ${isGeneratingScenario ? 'animate-spin' : ''}`} />
                 <span>{isGeneratingScenario ? 'Generating AI Case...' : 'Generate AI Case'}</span>
@@ -1174,7 +1179,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
               <button
                 onClick={handlePracticeOffline}
-                className="bg-ok-strong hover:bg-ok text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-ok/30 flex items-center space-x-1.5 transition hover:-translate-y-0.5"
+                className="w-full sm:w-auto justify-center bg-ok-strong hover:bg-ok text-on-brand font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-ok/30 flex items-center space-x-1.5 transition hover:-translate-y-0.5"
               >
                 <Play className="w-4 h-4" />
                 <span>Practice Offline (No AI)</span>
@@ -1182,7 +1187,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
               <button
                 onClick={() => setShowCustomModal(true)}
-                className="bg-surface-2 hover:bg-surface-3 text-ink font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-line flex items-center space-x-1.5 transition"
+                className="w-full sm:w-auto justify-center bg-surface-2 hover:bg-surface-3 text-ink font-semibold text-xs px-4 py-2.5 rounded-xl shadow border border-line flex items-center space-x-1.5 transition"
               >
                 <Plus className="w-4 h-4 text-brand" />
                 <span>Build Custom Case</span>
@@ -1190,7 +1195,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 mb-6">
             {scenarios.length === 0 && (
               <div className="md:col-span-3 rounded-2xl p-10 border border-dashed border-line-strong bg-surface-2/40 text-center">
                 <div className="w-11 h-11 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center mx-auto mb-3">
@@ -1247,7 +1252,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               onClick={handleStartSimulation}
               disabled={!selectedScenario}
               title={selectedScenario ? 'Start the live chat simulation' : 'Generate or build a case first'}
-              className={`bg-brand text-on-brand font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-brand/25 transition duration-200 flex items-center gap-2 mx-auto ${selectedScenario ? 'hover:bg-brand-strong hover:scale-[1.02]' : 'opacity-40 shadow-none cursor-not-allowed'}`}
+              className={`w-full sm:w-auto justify-center bg-brand text-on-brand font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-brand/25 transition duration-200 flex items-center gap-2 mx-auto ${selectedScenario ? 'hover:bg-brand-strong hover:scale-[1.02]' : 'opacity-40 shadow-none cursor-not-allowed'}`}
             >
               <Play className="w-5 h-5 fill-current" />
               <span>Start Connected Live Simulation</span>
@@ -1257,12 +1262,13 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             )}
           </div>
         </div>
+        </div>
       )}
 
       {/* CUSTOM CASE MODAL */}
       {showCustomModal && (
-        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-surface border border-line rounded-2xl p-4 sm:p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[92dvh] overflow-y-auto custom-scrollbar my-auto">
             <h3 className="text-lg font-bold text-ink flex items-center gap-2">
               <Plus className="w-5 h-5 text-brand" /> Build Custom Scenario
             </h3>
@@ -1278,7 +1284,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-ink-2 mb-1">Passenger Name</label>
                   <input
@@ -1303,7 +1309,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block text-ink-2 mb-1">PNR Ref</label>
                   <input
@@ -1336,7 +1342,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                   className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink"
                 />
               </div>
-              <div className="flex justify-end space-x-2 pt-2">
+              <div className="flex flex-wrap justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowCustomModal(false)}
@@ -1358,8 +1364,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {}
       {showSettingsModal && (
-        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-line rounded-2xl p-6 max-w-xl w-full shadow-2xl space-y-5">
+        <div className="fixed inset-0 bg-canvas/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-surface border border-line rounded-2xl p-4 sm:p-6 max-w-xl w-full shadow-2xl space-y-5 max-h-[92dvh] overflow-y-auto custom-scrollbar my-auto">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <h3 className="text-lg font-bold text-ink flex items-center gap-2">
                 <Settings className="w-5 h-5 text-warn" /> LLM & Endpoint Settings
@@ -1378,7 +1384,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 <label className="block text-ink-2 mb-1.5 font-medium flex items-center gap-1.5">
                   <Server className="w-3.5 h-3.5 text-brand" /> API Provider Type
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -1459,7 +1465,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* Hyperparameters Grid */}
-              <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div>
                   <label className="block text-ink-3 mb-1">Temperature ({temperature})</label>
                   <input
@@ -1496,7 +1502,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-line">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-line">
               <div className="text-[11px] leading-snug min-h-[16px]">
                 {llmTest === null ? (
                   <span className="text-ink-4">Connection not tested yet.</span>
@@ -1528,7 +1534,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <button
                   type="button"
                   onClick={handleResetLlmSettings}
@@ -1567,29 +1573,52 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
       {}
       {appState === 'simulating' && (
-        <div className="flex-1 grid grid-cols-12 overflow-hidden min-h-0">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          {/* Pane switcher for narrow screens; the three panels sit side by side from lg up */}
+          <div className="lg:hidden flex items-center gap-1 p-2 bg-surface border-b border-line shrink-0">
+            {[
+              { id: 'case', label: 'Case', icon: <User className="w-3.5 h-3.5" /> },
+              { id: 'chat', label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+              { id: 'policy', label: 'Policy', icon: <BookOpen className="w-3.5 h-3.5" /> }
+            ].map((pane) => (
+              <button
+                key={pane.id}
+                onClick={() => setActivePane(pane.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold border transition ${
+                  activePane === pane.id
+                    ? 'bg-brand text-on-brand border-brand'
+                    : 'bg-surface-2 text-ink-2 border-line hover:bg-surface-3'
+                }`}
+              >
+                {pane.icon}
+                {pane.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden min-h-0">
           {/* LEFT SIDEBAR: Passenger Profile & Telemetry */}
-          <div className="col-span-3 bg-surface-2/50 border-r border-line p-4 flex flex-col space-y-4 overflow-y-auto min-h-0">
+          <div className={`lg:col-span-3 ${activePane === 'case' ? 'flex' : 'hidden'} lg:flex bg-surface-2/50 lg:border-r border-line p-3 sm:p-4 flex-col gap-4 overflow-y-auto min-h-0 custom-scrollbar`}>
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-3 mb-2 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-brand" /> Passenger Information
               </h3>
               <div className="bg-surface/90 border border-line/80 rounded-xl p-3 space-y-2 text-xs">
-                <div className="flex justify-between border-b border-line pb-1.5">
+                <div className="flex flex-wrap justify-between gap-x-3 border-b border-line pb-1.5">
                   <span className="text-ink-3">Name</span>
-                  <span className="font-bold text-ink">{selectedScenario.passenger}</span>
+                  <span className="font-bold text-ink text-right break-words">{selectedScenario.passenger}</span>
                 </div>
-                <div className="flex justify-between border-b border-line pb-1.5">
+                <div className="flex flex-wrap justify-between gap-x-3 border-b border-line pb-1.5">
                   <span className="text-ink-3">PNR Reference</span>
-                  <span className="font-mono font-bold text-warn">{selectedScenario.pnr}</span>
+                  <span className="font-mono font-bold text-warn text-right break-all">{selectedScenario.pnr}</span>
                 </div>
-                <div className="flex justify-between border-b border-line pb-1.5">
+                <div className="flex flex-wrap justify-between gap-x-3 border-b border-line pb-1.5">
                   <span className="text-ink-3">Flight No.</span>
-                  <span className="font-mono text-ink">{selectedScenario.flight}</span>
+                  <span className="font-mono text-ink text-right break-words">{selectedScenario.flight}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex flex-wrap justify-between gap-x-3">
                   <span className="text-ink-3">Difficulty</span>
-                  <span className="font-bold text-ok">{selectedScenario.difficulty}</span>
+                  <span className="font-bold text-ok text-right">{selectedScenario.difficulty}</span>
                 </div>
               </div>
             </div>
@@ -1700,23 +1729,23 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           </div>
 
           {/* CENTER PANEL: Live Chat Workspace */}
-          <div className="col-span-6 flex flex-col bg-surface border-r border-line relative min-h-0">
-            <div className="bg-surface-2/40 border-b border-line px-4 py-2 flex items-center justify-between shrink-0">
-              <div className="flex items-center space-x-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-ok animate-pulse"></div>
-                <span className="text-xs font-bold text-ink">Live Agent Workspace</span>
+          <div className={`lg:col-span-6 ${activePane === 'chat' ? 'flex' : 'hidden'} lg:flex flex-col bg-surface lg:border-r border-line relative min-h-0`}>
+            <div className="bg-surface-2/40 border-b border-line px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-full bg-ok animate-pulse shrink-0"></div>
+                <span className="text-xs font-bold text-ink truncate">Live Agent Workspace</span>
               </div>
-              <span className="text-xs text-ink-3 font-mono">Chat ID: #RY-{Math.floor(100000 + Math.random() * 900000)}</span>
+              <span className="hidden sm:inline text-xs text-ink-3 font-mono shrink-0">Chat ID: #RY-{Math.floor(100000 + Math.random() * 900000)}</span>
             </div>
 
-            <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto space-y-3 min-h-0">
+            <div ref={chatContainerRef} className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-3 min-h-0 custom-scrollbar">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${msg.sender === 'agent' ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
+                    className={`max-w-[92%] sm:max-w-[85%] rounded-2xl px-3.5 sm:px-4 py-2.5 text-xs shadow-sm ${
                       msg.sender === 'agent'
                         ? msg.isHoldNotice
                           ? 'bg-warn/20 border border-warn/30 text-warn rounded-br-none'
@@ -1750,8 +1779,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             </div>
 
             {/* Quick Macro Buttons */}
-            <div className="bg-surface-2/30 border-t border-line p-2 flex items-center space-x-2 overflow-x-auto text-[11px] shrink-0">
-              <span className="text-ink-4 font-semibold text-[10px] uppercase pl-1">Macros:</span>
+            <div className="bg-surface-2/30 border-t border-line p-2 flex items-center gap-2 overflow-x-auto text-[11px] shrink-0 custom-scrollbar">
+              <span className="text-ink-4 font-semibold text-[10px] uppercase pl-1 shrink-0">Macros:</span>
               <button
                 onClick={() => handleInsertCanned("Thank you for contacting Ryanair support. Allow me a moment to look into your booking details.")}
                 className="bg-surface-2 hover:bg-surface-3 text-ink-2 px-2.5 py-1 rounded border border-line whitespace-nowrap"
@@ -1779,7 +1808,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
             </div>
 
             {/* Input Composer (Shift+Enter for newline, Enter to send) */}
-            <div className="p-3 bg-surface-2/80 border-t border-line flex items-center space-x-2 shrink-0">
+            <div className="p-2.5 sm:p-3 bg-surface-2/80 border-t border-line flex items-end sm:items-center gap-2 shrink-0">
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -1791,12 +1820,12 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 }}
                 rows={2}
                 placeholder={isOnHold ? "Customer is on hold. Type a message or click Resume..." : "Type response to customer... (Enter to send, Shift+Enter for newline)"}
-                className="flex-1 bg-surface border border-line rounded-xl px-4 py-2.5 text-xs text-ink placeholder-ink-4 focus:outline-none focus:border-brand transition resize-none"
+                className="flex-1 min-w-0 bg-surface border border-line rounded-xl px-3 sm:px-4 py-2.5 text-xs text-ink placeholder-ink-4 focus:outline-none focus:border-brand transition resize-none"
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isLoadingAi}
-                className="bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand p-3 rounded-xl transition flex items-center justify-center shadow"
+                className="shrink-0 bg-brand hover:bg-brand-strong disabled:opacity-50 text-on-brand p-3 rounded-xl transition flex items-center justify-center shadow"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -1804,7 +1833,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           </div>
 
           {/* RIGHT SIDEBAR: Ryanair Knowledge Base */}
-          <div className="col-span-3 bg-surface-2/60 border-l border-line p-4 flex flex-col space-y-3 overflow-hidden">
+          <div className={`lg:col-span-3 ${activePane === 'policy' ? 'flex' : 'hidden'} lg:flex bg-surface-2/60 lg:border-l border-line p-3 sm:p-4 flex-col gap-3 overflow-hidden min-h-0`}>
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-ink-2 flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-warn" /> Ryanair SOP Search
@@ -1837,12 +1866,13 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               )}
             </div>
           </div>
+          </div>
         </div>
       )}
 
       {}
       {appState === 'scorecard' && (
-        <div className="flex-1 max-w-4xl mx-auto w-full p-6 flex flex-col justify-start overflow-y-auto min-h-0 my-auto custom-scrollbar">
+        <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto p-3 sm:p-6 overflow-y-auto custom-scrollbar">
           {isEvaluating ? (
             <div className="text-center py-12 space-y-4">
               <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -1850,8 +1880,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               <p className="text-xs text-ink-3">Analyzing total handling time, typing velocity, live quality score, and Ryanair digital policy compliance.</p>
             </div>
           ) : scorecard ? (
-            <div className="bg-surface-2/80 border border-line rounded-2xl p-6 shadow-2xl space-y-6">
-              <div className="flex items-center justify-between border-b border-line pb-5">
+            <div className="bg-surface-2/80 border border-line rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-line pb-5">
                 <div>
                   <span className="text-xs font-bold text-brand uppercase tracking-widest">Performance Evaluation Scorecard</span>
                   <h2 className="text-2xl font-black text-ink mt-0.5">Session Resolution Audit</h2>
@@ -1868,7 +1898,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* Connected Performance Score Banner */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-surface/90 p-3.5 rounded-xl border border-line text-center">
                   <p className="text-[10px] text-ink-3 font-medium uppercase">Accumulated Quality Score</p>
                   <p className={`text-2xl font-black mt-1 ${scorecard.finalLiveScore >= 80 ? 'text-ok' : 'text-warn'}`}>
@@ -1892,7 +1922,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* Operational Telemetry Summary */}
-              <div className="grid grid-cols-4 gap-3 bg-surface/50 p-3 rounded-xl text-xs text-ink-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface/50 p-3 rounded-xl text-xs text-ink-2">
                 <div>
                   <span className="text-ink-4 block text-[10px]">Total Handling Time:</span>
                   <span className="font-mono font-bold">{scorecard.handlingTime}</span>
@@ -1920,7 +1950,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 <p className="text-xs text-ink-2 leading-relaxed">{scorecard.summary}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="bg-ok/10 border border-ok/30 p-4 rounded-xl space-y-2">
                   <h4 className="font-bold text-ok flex items-center gap-1.5">
                     <CheckCircle className="w-4 h-4" /> Key Strengths
@@ -1943,10 +1973,10 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3">
+              <div className="flex items-center justify-stretch sm:justify-end pt-3">
                 <button
                   onClick={() => setAppState('setup')}
-                  className="bg-surface-3 hover:bg-surface-3 text-ink font-semibold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5"
+                  className="w-full sm:w-auto justify-center bg-surface-3 hover:bg-surface-3 text-ink font-semibold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Start New Simulation</span>
