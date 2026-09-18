@@ -6,6 +6,9 @@ import {
   callLlm,
   cleanAndParseJson,
   extractLlmText,
+  isLocalOrigin,
+  isLocalUrl,
+  normalizeBaseUrl,
   resolveLlmParams
 } from '../src/llm.js';
 
@@ -168,5 +171,132 @@ describe('buildLlmRequest (Google Gemini)', () => {
     const withoutSchema = buildLlmRequest(settings());
     assert.equal('responseSchema' in withoutSchema.body.generationConfig, false);
     assert.equal('responseMimeType' in withoutSchema.body.generationConfig, false);
+  });
+});
+
+describe('normalizeBaseUrl', () => {
+  const originalLocation = globalThis.location;
+
+  /** Runs fn with a faked page origin (null = no location at all). */
+  const withLocation = (href, fn) => {
+    globalThis.location = href == null ? undefined : { href };
+    try {
+      fn();
+    } finally {
+      globalThis.location = originalLocation;
+    }
+  };
+
+  it('reroutes a localhost Base URL through the proxy when the app itself runs on localhost', () => {
+    withLocation('http://localhost:4173/', () => {
+      assert.equal(normalizeBaseUrl('http://localhost:3001/v1'), '/llm-proxy/v1');
+    });
+  });
+
+  it('collapses a pathless loopback URL onto the proxy root and trims stray slashes', () => {
+    withLocation('http://127.0.0.1:5173/chat', () => {
+      assert.equal(normalizeBaseUrl('  http://127.0.0.1:11434  '), '/llm-proxy');
+      assert.equal(normalizeBaseUrl('http://localhost:3001/v1/'), '/llm-proxy/v1');
+    });
+  });
+
+  it('keeps loopback Base URLs as typed when the app is a deployed static page', () => {
+    withLocation('https://example.github.io/ryanair-agent-simulator/', () => {
+      assert.equal(normalizeBaseUrl('http://localhost:3001/v1'), 'http://localhost:3001/v1');
+    });
+  });
+
+  it('keeps loopback Base URLs as typed when there is no page location at all', () => {
+    withLocation(null, () => {
+      assert.equal(normalizeBaseUrl('http://localhost:3001/v1'), 'http://localhost:3001/v1');
+    });
+  });
+
+  it('never touches public hosts, same-origin paths or non-URLs', () => {
+    withLocation('http://localhost:5173/', () => {
+      assert.equal(normalizeBaseUrl('https://api.openai.com/v1'), 'https://api.openai.com/v1');
+      assert.equal(normalizeBaseUrl('/llm-proxy/v1'), '/llm-proxy/v1');
+      assert.equal(normalizeBaseUrl(''), '');
+      assert.equal(normalizeBaseUrl('not a url'), 'not a url');
+    });
+  });
+});
+
+describe('isLocalUrl / isLocalOrigin', () => {
+  it('recognises absolute loopback URLs only', () => {
+    assert.equal(isLocalUrl('http://localhost:3001/v1'), true);
+    assert.equal(isLocalUrl('http://[::1]:3001/v1'), true);
+    assert.equal(isLocalUrl('https://api.openai.com/v1'), false);
+    assert.equal(isLocalUrl('/llm-proxy/v1'), false);
+    assert.equal(isLocalUrl(''), false);
+  });
+
+  it('reports the app origin as local only when served from this machine', () => {
+    const originalLocation = globalThis.location;
+    try {
+      globalThis.location = { href: 'http://localhost:4173/chat' };
+      assert.equal(isLocalOrigin(), true);
+      globalThis.location = { href: 'https://example.github.io/' };
+      assert.equal(isLocalOrigin(), false);
+      globalThis.location = undefined;
+      assert.equal(isLocalOrigin(), false);
+    } finally {
+      globalThis.location = originalLocation;
+    }
+  });
+});
+
+describe('buildLlmRequest (OpenAI-compatible)', () => {
+  it('appends /chat/completions and sends auth, model and sampling settings', () => {
+    const { provider, endpoint, headers, body } = buildLlmRequest(
+      settings({
+        provider: 'openai_compatible',
+        baseUrl: 'http://localhost:3001/v1',
+        apiKey: ' test-key ',
+        modelId: '   ',
+        chatHistory: [{ sender: 'customer', text: 'Hello?' }],
+        jsonSchema: { type: 'OBJECT' }
+      })
+    );
+
+    assert.equal(provider, 'openai_compatible');
+    assert.equal(endpoint, 'http://localhost:3001/v1/chat/completions');
+    assert.equal(headers.Authorization, 'Bearer test-key');
+    assert.deepEqual(body.messages, [
+      { role: 'system', content: 'You are a passenger chatting with a Ryanair agent.' },
+      { role: 'assistant', content: 'Hello?' }
+    ]);
+    assert.equal(body.model, 'gpt-4o-mini');
+    assert.equal(body.temperature, 0.7);
+    assert.deepEqual(body.response_format, { type: 'json_object' });
+  });
+
+  it('does not duplicate /chat/completions when the Base URL already ends with it', () => {
+    const { endpoint } = buildLlmRequest(
+      settings({ provider: 'openai_compatible', baseUrl: 'https://api.openai.com/v1/chat/completions' })
+    );
+    assert.equal(endpoint, 'https://api.openai.com/v1/chat/completions');
+  });
+});
+
+describe('callLlm', () => {
+  it('posts the built request and returns the assistant text', async () => {
+    stubFetch(() => jsonResponse(openAiEnvelope('Agent reply')));
+    const text = await callLlm(
+      settings({ provider: 'openai_compatible', baseUrl: 'https://api.openai.com/v1' })
+    );
+
+    assert.equal(text, 'Agent reply');
+    assert.equal(fetchCalls.length, 1);
+    assert.equal(fetchCalls[0].url, 'https://api.openai.com/v1/chat/completions');
+    assert.equal(fetchCalls[0].init.method, 'POST');
+  });
+
+  it('surfaces non-2xx responses as a provider-labelled error', async () => {
+    stubFetch(() => jsonResponse({ error: 'nope' }, { ok: false, status: 401 }));
+    await assert.rejects(
+      () => callLlm(settings({ provider: 'openai_compatible' })),
+      /OpenAI Endpoint Error \(401\)/
+    );
   });
 });

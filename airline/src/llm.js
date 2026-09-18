@@ -75,14 +75,46 @@ const toOpenAiRole = (m) =>
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**
+ * True when the given string is an absolute http(s) URL pointing at this
+ * machine (a loopback host). Pure.
+ */
+export const isLocalUrl = (url) => {
+  let parsed;
+  try {
+    parsed = new URL((url || '').trim());
+  } catch {
+    return false;
+  }
+  return /^https?:$/.test(parsed.protocol) && LOCAL_HOSTS.has(parsed.hostname);
+};
+
+/**
+ * True when the app page itself is served from this machine - i.e. the one
+ * environment where the Vite dev/preview proxy (/llm-proxy) actually exists.
+ * A deployed static page (GitHub Pages or any other host) returns false.
+ */
+export const isLocalOrigin = () => {
+  try {
+    return LOCAL_HOSTS.has(new URL(globalThis.location.href).hostname);
+  } catch {
+    return false; // no page location (tests, SSR) - behave like a deployed app
+  }
+};
+
+/**
  * Reroutes local LLM servers through the Vite proxy so the browser request
  * stays same-origin (local servers send no CORS headers, so a direct call is
  * blocked before it leaves the page and only surfaces as "Failed to fetch").
  *
- *   http://localhost:3001/v1  ->  /llm-proxy/v1
- *   http://127.0.0.1:11434    ->  /llm-proxy
+ *   http://localhost:3001/v1  ->  /llm-proxy/v1      (app served locally)
+ *   http://127.0.0.1:11434    ->  /llm-proxy          (app served locally)
  *   https://api.openai.com/v1 ->  unchanged (public host)
  *   /llm-proxy/v1             ->  unchanged (already same-origin)
+ *
+ * The proxy only exists while the app itself is served from this machine
+ * (vite dev / vite preview). When the app runs as a deployed static page
+ * (e.g. GitHub Pages) loopback Base URLs are kept as typed - rewriting them
+ * would POST to the static host and fail with 404/405.
  *
  * Pure: returns the Base URL that fetch should actually use.
  */
@@ -98,7 +130,10 @@ export const normalizeBaseUrl = (baseUrl) => {
     return raw;
   }
 
-  if (!LOCAL_HOSTS.has(parsed.hostname)) return raw;
+  // Reroute only when the proxy can exist: target is this machine AND the page
+  // itself is served locally. On a deployed page a rewritten loopback URL
+  // would hit the static host's 404/405 handler instead of the LLM server.
+  if (!LOCAL_HOSTS.has(parsed.hostname) || !isLocalOrigin()) return raw;
 
   const path = parsed.pathname.replace(/^\/+/, '').replace(/\/+$/, '');
   return path ? `/llm-proxy/${path}` : '/llm-proxy';

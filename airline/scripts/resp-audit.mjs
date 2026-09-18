@@ -71,6 +71,30 @@ const CLICK_PRACTICE = `(() => {
   return 'clicked';
 })()`;
 
+// Runtime health of the live chat: real messages rendered, console error count.
+const CHAT_STATE = `(() => {
+  const chat = document.querySelectorAll('[class*="rounded-2xl"] p');
+  const texts = [...chat].map((p) => p.textContent.trim()).filter(Boolean);
+  const customer = texts.filter((t) => /Hello, my name is/.test(t));
+  return JSON.stringify({
+    chatBubbles: texts.length,
+    customerBubbles: customer.length,
+    firstCustomer: customer[0] ? customer[0].slice(0, 80) : null,
+    errorCount: (window.__auditErrors || []).length,
+    errors: (window.__auditErrors || []).slice(0, 3)
+  });
+})()`;
+
+// Error hook must be installed before the SPA boots, so reinstall on reload.
+const INSTALL_HOOK = `(() => {
+  if (window.__auditErrors) return 'already';
+  window.__auditErrors = [];
+  window.addEventListener('error', (e) => {
+    window.__auditErrors.push(String(e.message || e.error || 'unknown error').slice(0, 120));
+  });
+  return 'installed';
+})()`;
+
 // --- minimal CDP client -------------------------------------------------------
 class Cdp {
   constructor(ws) {
@@ -175,6 +199,7 @@ const main = async () => {
     await sleep(300);
   }
   await sleep(900);
+  await cdp.evaluate(INSTALL_HOOK);
 
   const report = [];
   let failures = 0;
@@ -188,21 +213,29 @@ const main = async () => {
       await sleep(500);
       const m = JSON.parse(await cdp.evaluate(MEASURE));
       const g = JSON.parse(await cdp.evaluate(GEOMETRY));
+      const h = JSON.parse(await cdp.evaluate(CHAT_STATE));
       const bad = m.pageOverflow || m.offenderCount > 0;
       if (bad) failures += 1;
       console.log(
         `${bad ? 'FAIL' : 'PASS'}  ${vp.name.padEnd(18)} vw=${String(m.vw).padStart(4)} docScrollW=${String(m.docScrollW).padStart(4)} ` +
-        `offenders=${m.offenderCount} scrollerKids=${m.scrollerKids} headerH=${g.headerHeight} sameRow=${g.sameRow}`
+        `offenders=${m.offenderCount} scrollerKids=${m.scrollerKids} headerH=${g.headerHeight} sameRow=${g.sameRow} chat=${h.chatBubbles}/${h.customerBubbles} consoleErrors=${h.errorCount}`
       );
       for (const o of m.offenders) console.log(`        -> <${o.tag} class="${o.cls}"> w=${o.w} right=${o.right}`);
-      report.push({ screen, vp: vp.name, ...m, headerHeight: g.headerHeight, sameRow: g.sameRow });
+      report.push({ screen, vp: vp.name, ...m, headerHeight: g.headerHeight, sameRow: g.sameRow, chat: h });
     }
   };
 
   await sweep('setup', 'SETUP SCREEN');
 
   const clicked = await cdp.evaluate(CLICK_PRACTICE);
-  await sleep(1600);
+  await sleep(3000);
+  const chatNow = JSON.parse(await cdp.evaluate(CHAT_STATE));
+  console.log(`practice clicked: ${clicked} chatBubbles=${chatNow.chatBubbles} customerBubbles=${chatNow.customerBubbles} consoleErrors=${chatNow.errorCount}`);
+  if (chatNow.errorCount > 0) console.log('  errors: ' + chatNow.errors.join(' | '));
+  if (chatNow.customerBubbles === 0) {
+    failures += 1;
+    console.log('  FAIL: no customer greeting rendered after starting a practice session');
+  }
   await sweep('session', `LIVE SESSION (practice: ${clicked})`);
 
   // Light theme at phone width must not overflow either.

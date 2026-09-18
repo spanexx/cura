@@ -41,7 +41,7 @@ import {
   X
 } from 'lucide-react';
 
-import { callLlm, cleanAndParseJson, normalizeBaseUrl } from './llm';
+import { callLlm, cleanAndParseJson, isLocalOrigin, isLocalUrl, normalizeBaseUrl } from './llm';
 import { generateAirlineCase, AIRLINE_CATEGORY_NAMES } from './airlineCases';
 import { DEFAULT_LLM_SETTINGS, clearLlmSettings, loadLlmSettings, saveLlmSettings } from './settings';
 import { loadSessionHistory, appendSession, saveSessionHistory, clearSessionHistory, sanitizeSession } from './history';
@@ -267,13 +267,25 @@ export default function App() {
       } else if (err instanceof TypeError) {
         const effectiveUrl = normalizeBaseUrl(baseUrl);
         const wasRerouted = effectiveUrl !== baseUrl.trim();
+        let hint;
+        if (wasRerouted) {
+          hint =
+            'Your local Base URL was routed through the Vite proxy, so the address is fine - ' +
+            'check the LLM server is running and that the app is opened via http://localhost:4173 or :5173.';
+        } else if (isLocalUrl(baseUrl) && !isLocalOrigin()) {
+          hint =
+            'This app is running as a deployed page (e.g. GitHub Pages), which cannot reach an LLM ' +
+            'server on your computer - browsers block calls to http://localhost from a hosted page. ' +
+            'Run the app locally instead (npm run dev, then open http://localhost:5173).';
+        } else {
+          hint =
+            'check the LLM server is running; if the Base URL points straight at http://localhost:<port>, ' +
+            'use "/llm-proxy/v1" (the Vite dev/preview proxy); and make sure the app is opened via ' +
+            'http://localhost:4173 or :5173, not as a local file.';
+        }
         setLlmTest({
           state: 'error',
-          message: `Could not reach ${effectiveUrl || 'the endpoint'} from the browser. ${
-            wasRerouted
-              ? 'Your local Base URL was routed through the Vite proxy, so the address is fine - '
-              : ''
-          }check the LLM server is running; if the Base URL points straight at http://localhost:<port>, use "/llm-proxy/v1" (the Vite dev/preview proxy); and make sure the app is opened via http://localhost:4173 or :5173, not as a local file.`
+          message: `Could not reach ${effectiveUrl || 'the endpoint'} from the browser. ${hint}`
         });
       } else {
         setLlmTest({ state: 'error', message: err.message });
@@ -383,7 +395,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
     setScenarios((prev) => [practiceCase, ...prev]);
     setSelectedScenario(practiceCase);
     setRecentTitles((prev) => [practiceCase.title, ...prev].slice(0, 5));
-    handleStartSimulation(true);
+    handleStartSimulation(practiceCase, true);
   };
 
   const handleAddCustomScenario = (e) => {
@@ -672,7 +684,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           {
             id: Date.now() + Math.random(),
             sender: 'customer',
-            text: getPracticeReply(currentChatHistory[currentChatHistory.length - 1]?.text),
+            text: getPracticeReply(newAgentMsg.text),
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           }
         ]);
@@ -721,7 +733,8 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
     setInputMessage(text);
   };
 
-  const handleStartSimulation = (practice = false) => {
+  const handleStartSimulation = (scenario = selectedScenario, practice = false) => {
+    if (!scenario) return;
     setIsPracticeMode(practice);
     practicePushbacksRef.current = 0;
     if (practiceTimerRef.current) clearTimeout(practiceTimerRef.current);
@@ -750,7 +763,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
     const initialMsg = {
       id: Date.now(),
       sender: 'customer',
-      text: `Hello, my name is ${selectedScenario.passenger} (Booking ref: ${selectedScenario.pnr}). I need urgent assistance with my flight ${selectedScenario.flight}. ${selectedScenario.details}`,
+      text: `Hello, my name is ${scenario.passenger} (Booking ref: ${scenario.pnr}). I need urgent assistance with my flight ${scenario.flight}. ${scenario.details}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setMessages([initialMsg]);
@@ -992,12 +1005,15 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
         </div>
 
         {appState === 'simulating' && (
-          <div className="basis-full xl:basis-auto max-w-full min-w-0 flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-0.5 sm:pb-0">
+          <div className="basis-full xl:basis-auto max-w-full min-w-0 flex flex-wrap items-center gap-2 sm:gap-3 pb-0.5">
               {/* Live Interconnected Quality Rating */}
-              <div className="shrink-0 flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
+              <div title="Live Quality Score" className="shrink-0 flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
                 <Gauge className="w-4 h-4 text-ok" />
                 <div>
-                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Live Quality Score</p>
+                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">
+                    <span className="hidden sm:inline">Live Quality Score</span>
+                    <span className="sm:hidden">Quality</span>
+                  </p>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-sm font-mono font-black ${
                       liveScore >= 85 ? 'text-ok' : liveScore >= 70 ? 'text-warn' : 'text-danger'
@@ -1017,18 +1033,21 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </div>
 
               {/* 15-Min Handling Clock */}
-              <div className="shrink-0 flex items-center space-x-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-line">
+              <div title="Target Resolution — 15 minute handling limit" className="shrink-0 flex items-center space-x-2 bg-surface-2/80 px-3 py-1.5 rounded-lg border border-line">
                 <Clock className={`w-4 h-4 ${totalSeconds < 180 ? 'text-danger animate-pulse' : 'text-brand'}`} />
                 <div>
-                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">Target Resolution</p>
+                  <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">
+                    <span className="hidden sm:inline">Target Resolution</span>
+                    <span className="sm:hidden">Time Left</span>
+                  </p>
                   <p className={`text-xs font-mono font-bold ${totalSeconds < 180 ? 'text-danger' : 'text-ink'}`}>
-                    {formatTime(totalSeconds)} / 15:00
+                    {formatTime(totalSeconds)}<span className="hidden sm:inline"> / 15:00</span>
                   </p>
                 </div>
               </div>
 
               {/* 2-Min Response Window Clock */}
-              <div className={`shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all ${
+              <div title={isOnHold ? 'Customer on Hold' : '2-Minute SLA Response Window'} className={`shrink-0 flex items-center space-x-2 px-3 py-1.5 rounded-lg border transition-all ${
                 isOnHold 
                   ? 'bg-warn/15 border-warn/30 text-warn' 
                   : responseSeconds < 30 
@@ -1038,7 +1057,11 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 <Zap className="w-4 h-4 text-warn" />
                 <div>
                   <p className="text-[9px] text-ink-3 font-medium uppercase tracking-wider">
-                    {isOnHold ? 'Customer on Hold' : '2-Min SLA Window'}
+                    {isOnHold ? (
+                      <><span className="hidden sm:inline">Customer on Hold</span><span className="sm:hidden">On Hold</span></>
+                    ) : (
+                      <><span className="hidden sm:inline">2-Min SLA Window</span><span className="sm:hidden">SLA</span></>
+                    )}
                   </p>
                   <p className="text-xs font-mono font-bold">
                     {isOnHold ? 'PAUSED' : formatTime(responseSeconds)}
@@ -1046,8 +1069,9 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 </div>
               </div>
 
-              <span className="shrink-0 text-[10px] font-mono bg-ok/15 text-ok border border-ok/30 px-2 py-1 rounded">
-                {isPracticeMode ? 'PRACTICE OFFLINE' : 'AI CONNECTED'}
+              <span title={isPracticeMode ? 'Practice Offline session' : 'AI Connected session'} className="shrink-0 text-[10px] font-mono bg-ok/15 text-ok border border-ok/30 px-2 py-1 rounded">
+                <span className="hidden sm:inline">{isPracticeMode ? 'PRACTICE OFFLINE' : 'AI CONNECTED'}</span>
+                <span className="sm:hidden">{isPracticeMode ? 'PRACTICE' : 'AI'}</span>
               </span>
 
               <button
@@ -1250,7 +1274,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
 
           <div className="text-center">
             <button
-              onClick={handleStartSimulation}
+              onClick={() => handleStartSimulation(selectedScenario, false)}
               disabled={!selectedScenario}
               title={selectedScenario ? 'Start the live chat simulation' : 'Generate or build a case first'}
               className={`w-full sm:w-auto justify-center bg-brand text-on-brand font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-brand/25 transition duration-200 flex items-center gap-2 mx-auto ${selectedScenario ? 'hover:bg-brand-strong hover:scale-[1.02]' : 'opacity-40 shadow-none cursor-not-allowed'}`}
