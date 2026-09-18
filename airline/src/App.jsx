@@ -37,7 +37,8 @@ import {
   Server,
   Plus,
   Sun,
-  Moon
+  Moon,
+  X
 } from 'lucide-react';
 
 import { callLlm, cleanAndParseJson, normalizeBaseUrl } from './llm';
@@ -964,7 +965,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <button
             onClick={() => setTheme((prev) => nextTheme(prev))}
             className="bg-surface-2 hover:bg-surface-3 text-ink-2 hover:text-ink border border-line p-2 rounded-lg transition shrink-0"
@@ -988,9 +989,10 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               {provider === 'openai_compatible' ? 'OpenAI Compatible' : 'Gemini'}
             </span>
           </button>
+        </div>
 
-          {appState === 'simulating' && (
-            <div className="order-last w-full xl:order-none xl:w-auto flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0 pb-0.5 sm:pb-0">
+        {appState === 'simulating' && (
+          <div className="basis-full xl:basis-auto max-w-full min-w-0 flex items-center gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-0.5 sm:pb-0">
               {/* Live Interconnected Quality Rating */}
               <div className="shrink-0 flex items-center space-x-2 bg-canvas/80 px-3 py-1.5 rounded-lg border border-line/80">
                 <Gauge className="w-4 h-4 text-ok" />
@@ -1057,8 +1059,7 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
                 <span className="sm:hidden">Resolve</span>
               </button>
             </div>
-          )}
-        </div>
+        )}
       </header>
       {/* Signature airline hairline in the secondary accent colour */}
       <div className="h-0.5 bg-accent/60 shrink-0"></div>
@@ -1372,9 +1373,11 @@ IMPORTANT: Return ONLY a valid JSON object matching this schema. Do not add mark
               </h3>
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="text-ink-3 hover:text-ink text-xs font-bold"
+                className="text-ink-3 hover:text-ink text-xs font-bold p-1.5 -m-1.5 rounded-lg hover:bg-surface-2 transition"
+                title="Close settings"
+                aria-label="Close settings"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
